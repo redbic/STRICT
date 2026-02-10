@@ -80,7 +80,7 @@ class Game {
         this.canvas.height = window.innerHeight;
     }
     
-    init(zoneName, playerName, isMultiplayer = false) {
+    init(zoneName, playerName) {
         // Load zone
         const zoneData = ZONES[zoneName];
         if (!zoneData) {
@@ -105,18 +105,6 @@ class Game {
             playerName
         );
         this.players.push(this.localPlayer);
-        
-        // Add enemies for single player
-        if (!isMultiplayer && Number.isInteger(this.zone.enemyCount) && this.zone.enemyCount > 0) {
-            for (let i = 1; i <= this.zone.enemyCount; i++) {
-                const enemy = new Enemy(
-                    this.zone.startX + (i * 120) - 180,
-                    this.zone.startY + 200,
-                    'enemy-' + i
-                );
-                this.enemies.push(enemy);
-            }
-        }
         
         this.gameStarted = true;
     }
@@ -187,7 +175,7 @@ class Game {
     }
 
     transitionZone(zoneName, isMultiplayer, roster = [], localId = '') {
-        this.init(zoneName, this.localPlayer ? this.localPlayer.username : 'Player', isMultiplayer);
+        this.init(zoneName, this.localPlayer ? this.localPlayer.username : 'Player');
         if (isMultiplayer) {
             this.syncMultiplayerPlayers(roster, localId);
         }
