@@ -1,4 +1,4 @@
-# Deployment Guide for STRICT Racing
+# Deployment Guide for STRICT Adventure
 
 ## Prerequisites
 - A GitHub account
@@ -9,7 +9,7 @@
 
 1. Go to [Neon.tech](https://neon.tech) and sign up/log in
 2. Click "Create Project"
-3. Name your project (e.g., "strict-racing")
+3. Name your project (e.g., "strict-adventure")
 4. Select a region close to your target audience
 5. Click "Create Project"
 6. Copy the connection string that appears (it starts with `postgresql://`)
@@ -26,7 +26,7 @@
    - If not connected, click "Connect GitHub" and authorize Render
    - Select the `redbic/STRICT` repository
 4. Configure the service:
-   - **Name**: strict-racing (or your preferred name)
+   - **Name**: strict-adventure (or your preferred name)
    - **Environment**: Node
    - **Region**: Choose closest to your audience
    - **Branch**: Select your main branch
@@ -56,14 +56,14 @@
 
 ## Step 3: Verify Deployment
 
-1. Once deployed, Render will provide a URL (e.g., `https://strict-racing.onrender.com`)
+1. Once deployed, Render will provide a URL (e.g., `https://strict-adventure.onrender.com`)
 2. Open the URL in your browser
-3. You should see the STRICT Racing game menu
+3. You should see the STRICT Adventure game menu
 4. Test the following:
    - Enter a username
    - Click "Single Player"
-   - Select a track
-   - Play a race
+   - Select an area
+   - Play the adventure
    - Check the leaderboard
 
 ## Step 4: Database Initialization
@@ -73,7 +73,7 @@ The database tables will be created automatically when the server starts for the
 1. Going to your Neon.tech dashboard
 2. Selecting your project
 3. Going to the SQL Editor
-4. Running: `SELECT * FROM players;` and `SELECT * FROM race_results;`
+4. Running: `SELECT * FROM players;` and `SELECT * FROM game_results;`
 
 ## Troubleshooting
 
