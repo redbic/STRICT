@@ -136,7 +136,7 @@ function setupNetworkHandlers() {
 
     networkManager.onZoneEnter = (data) => {
         if (game && data.zoneId) {
-            game.transitionZone(data.zoneId, true, currentRoomPlayers, networkManager.playerId);
+            game.transitionZone(data.zoneId, currentRoomPlayers, networkManager.playerId);
         }
     };
     
@@ -239,6 +239,8 @@ function startGame(zoneName) {
     game.onPortalEnter = (targetZoneId) => {
         if (networkManager) {
             networkManager.enterZone(targetZoneId);
+        } else {
+            console.error('No network connection for portal transition');
         }
     };
     
@@ -269,6 +271,8 @@ function recallToHub() {
 
     if (networkManager) {
         networkManager.enterZone('hub');
+    } else {
+        console.error('No network connection for recall');
     }
 }
 

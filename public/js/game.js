@@ -174,11 +174,9 @@ class Game {
         this.portalCooldown = 30;
     }
 
-    transitionZone(zoneName, isMultiplayer, roster = [], localId = '') {
+    transitionZone(zoneName, roster = [], localId = '') {
         this.init(zoneName, this.localPlayer ? this.localPlayer.username : 'Player');
-        if (isMultiplayer) {
-            this.syncMultiplayerPlayers(roster, localId);
-        }
+        this.syncMultiplayerPlayers(roster, localId);
     }
 
     syncMultiplayerPlayers(roster, localId) {
