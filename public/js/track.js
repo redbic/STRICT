@@ -155,90 +155,38 @@ class Zone {
 
 // Zone definitions
 const ZONES = {
-    forest: {
-        name: 'Dark Forest',
-        width: 2000,
-        height: 1500,
-        startX: 300,
-        startY: 300,
-        wallColor: '#2d5a1e',
-        floorColor: '#1a3a12',
-        totalLevels: 3,
+    hub: {
+        name: 'The Archive Hub',
+        width: 1800,
+        height: 1400,
+        startX: 900,
+        startY: 700,
+        isHub: true,
+        wallColor: '#3a2f2a',
+        floorColor: '#1f1a18',
+        totalLevels: 1,
         walls: [
             // Outer boundary
-            { x: 0, y: 0, width: 2000, height: 50 },
-            { x: 0, y: 0, width: 50, height: 1500 },
-            { x: 0, y: 1450, width: 2000, height: 50 },
-            { x: 1950, y: 0, width: 50, height: 1500 },
-            
-            // Trees and obstacles
-            { x: 400, y: 400, width: 80, height: 80 },
-            { x: 700, y: 200, width: 60, height: 120 },
-            { x: 1000, y: 500, width: 100, height: 100 },
-            { x: 1300, y: 300, width: 70, height: 70 },
-            { x: 600, y: 800, width: 90, height: 90 },
-            { x: 1500, y: 700, width: 80, height: 120 },
-            { x: 900, y: 1000, width: 120, height: 60 },
-            { x: 1700, y: 1100, width: 80, height: 80 }
+            { x: 0, y: 0, width: 1800, height: 50 },
+            { x: 0, y: 0, width: 50, height: 1400 },
+            { x: 0, y: 1350, width: 1800, height: 50 },
+            { x: 1750, y: 0, width: 50, height: 1400 },
+
+            // Central plaza structures
+            { x: 820, y: 560, width: 160, height: 40 },
+            { x: 820, y: 800, width: 160, height: 40 },
+            { x: 740, y: 640, width: 40, height: 120 },
+            { x: 1020, y: 640, width: 40, height: 120 },
+
+            // Market stalls
+            { x: 320, y: 420, width: 120, height: 60 },
+            { x: 320, y: 520, width: 120, height: 60 },
+            { x: 1360, y: 420, width: 120, height: 60 },
+            { x: 1360, y: 520, width: 120, height: 60 }
         ],
         nodes: [
-            { x: 200, y: 250, width: 100, height: 100 },
-            { x: 700, y: 150, width: 100, height: 100 },
-            { x: 1400, y: 150, width: 100, height: 100 },
-            { x: 1700, y: 600, width: 100, height: 100 },
-            { x: 1400, y: 1250, width: 100, height: 100 },
-            { x: 700, y: 1250, width: 100, height: 100 }
+            { x: 860, y: 660, width: 80, height: 80 }
         ],
-        pickups: [
-            { x: 500, y: 200, collected: false, respawnTime: 0 },
-            { x: 1000, y: 200, collected: false, respawnTime: 0 },
-            { x: 1500, y: 200, collected: false, respawnTime: 0 },
-            { x: 500, y: 1300, collected: false, respawnTime: 0 },
-            { x: 1000, y: 1300, collected: false, respawnTime: 0 },
-            { x: 1500, y: 1300, collected: false, respawnTime: 0 }
-        ]
-    },
-    
-    dungeon: {
-        name: 'Ancient Dungeon',
-        width: 2500,
-        height: 2000,
-        startX: 400,
-        startY: 400,
-        wallColor: '#4a3728',
-        floorColor: '#2a2018',
-        totalLevels: 3,
-        walls: [
-            // Outer boundary
-            { x: 0, y: 0, width: 2500, height: 50 },
-            { x: 0, y: 0, width: 50, height: 2000 },
-            { x: 0, y: 1950, width: 2500, height: 50 },
-            { x: 2450, y: 0, width: 50, height: 2000 },
-            
-            // Dungeon walls and corridors
-            { x: 400, y: 400, width: 100, height: 600 },
-            { x: 800, y: 200, width: 100, height: 800 },
-            { x: 1200, y: 500, width: 100, height: 700 },
-            { x: 1600, y: 300, width: 100, height: 600 },
-            { x: 2000, y: 600, width: 100, height: 800 }
-        ],
-        nodes: [
-            { x: 300, y: 350, width: 100, height: 100 },
-            { x: 600, y: 250, width: 100, height: 100 },
-            { x: 1000, y: 450, width: 100, height: 100 },
-            { x: 1400, y: 350, width: 100, height: 100 },
-            { x: 1800, y: 550, width: 100, height: 100 },
-            { x: 2100, y: 700, width: 100, height: 100 },
-            { x: 1800, y: 1200, width: 100, height: 100 },
-            { x: 1000, y: 1400, width: 100, height: 100 }
-        ],
-        pickups: [
-            { x: 650, y: 300, collected: false, respawnTime: 0 },
-            { x: 1050, y: 500, collected: false, respawnTime: 0 },
-            { x: 1450, y: 400, collected: false, respawnTime: 0 },
-            { x: 1850, y: 600, collected: false, respawnTime: 0 },
-            { x: 1850, y: 1250, collected: false, respawnTime: 0 },
-            { x: 1050, y: 1450, collected: false, respawnTime: 0 }
-        ]
+        pickups: []
     }
 };

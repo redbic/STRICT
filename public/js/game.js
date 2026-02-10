@@ -160,8 +160,10 @@ class Game {
         // Update UI
         this.updateUI();
         
-        // Check game over
-        this.checkGameOver();
+        // Check game over (skip in hub)
+        if (!this.zone.isHub) {
+            this.checkGameOver();
+        }
     }
     
     updateEnemy(enemy) {

@@ -39,8 +39,8 @@ function setupEventListeners() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username })
         }).catch(err => console.error('Failed to register player:', err));
-        
-        showScreen('areaSelect');
+
+        showScreen('hub');
     });
     
     document.getElementById('multiPlayerBtn').addEventListener('click', async () => {
@@ -70,7 +70,7 @@ function setupEventListeners() {
                 showScreen('lobby');
             } catch (error) {
                 alert('Failed to connect to server. Playing single player instead.');
-                showScreen('areaSelect');
+                showScreen('hub');
             }
         }
     });
@@ -80,24 +80,20 @@ function setupEventListeners() {
         await loadLeaderboard();
     });
     
-    // Track selection
-    document.querySelectorAll('.zone-card').forEach(card => {
-        card.addEventListener('click', () => {
-            const zoneName = card.dataset.zone;
-            startGame(zoneName);
-        });
+    document.getElementById('enterHubBtn').addEventListener('click', () => {
+        startGame('hub');
     });
-    
+
     document.getElementById('backToMenuBtn').addEventListener('click', () => {
         showScreen('menu');
     });
-    
+
     // Lobby
     document.getElementById('startAdventureBtn').addEventListener('click', () => {
         if (networkManager) {
             networkManager.startGame();
         }
-        startGame('forest', true);
+        startGame('hub', true);
     });
     
     document.getElementById('leaveLobbyBtn').addEventListener('click', () => {
