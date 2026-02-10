@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>STRICT Racing - Super Mario Kart Style</title>
+    <title>STRICT Adventure - Top-Down Adventure Game</title>
     <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
     <div id="menu" class="screen active">
         <div class="menu-container">
-            <h1 class="game-title">🏁 STRICT RACING 🏁</h1>
+            <h1 class="game-title">⚔️ STRICT ADVENTURE ⚔️</h1>
             <div class="menu-content">
                 <input type="text" id="username" placeholder="Enter your name" maxlength="20">
                 <button id="singlePlayerBtn" class="menu-btn">Single Player</button>
@@ -19,17 +19,17 @@
         </div>
     </div>
 
-    <div id="trackSelect" class="screen">
+    <div id="areaSelect" class="screen">
         <div class="menu-container">
-            <h2>Select Track</h2>
+            <h2>Select Area</h2>
             <div class="track-grid">
-                <div class="track-card" data-track="circuit">
-                    <h3>🏎️ Speed Circuit</h3>
-                    <p>A fast oval track with tight turns</p>
-                </div>
                 <div class="track-card" data-track="forest">
-                    <h3>🌲 Forest Path</h3>
-                    <p>Winding path through the woods</p>
+                    <h3>🌲 Dark Forest</h3>
+                    <p>A mysterious forest filled with creatures</p>
+                </div>
+                <div class="track-card" data-track="dungeon">
+                    <h3>🏰 Ancient Dungeon</h3>
+                    <p>Treacherous ruins with powerful enemies</p>
                 </div>
             </div>
             <button id="backToMenuBtn" class="menu-btn">Back</button>
@@ -43,7 +43,7 @@
                 <p>Room Code: <span id="roomCode"></span></p>
             </div>
             <div id="playersList"></div>
-            <button id="startRaceBtn" class="menu-btn">Start Race</button>
+            <button id="startRaceBtn" class="menu-btn">Start Adventure</button>
             <button id="leaveLobbyBtn" class="menu-btn">Leave</button>
         </div>
     </div>
@@ -58,10 +58,10 @@
 
     <div id="game" class="screen">
         <div id="gameUI">
-            <div id="raceInfo">
-                <div class="ui-element">Lap: <span id="currentLap">1</span>/<span id="totalLaps">3</span></div>
-                <div class="ui-element">Time: <span id="raceTime">0:00</span></div>
-                <div class="ui-element">Position: <span id="position">1</span>/<span id="totalPlayers">4</span></div>
+            <div id="gameInfo">
+                <div class="ui-element">Level: <span id="currentLevel">1</span>/<span id="totalLevels">3</span></div>
+                <div class="ui-element">Score: <span id="gameScore">0:00</span></div>
+                <div class="ui-element">HP: <span id="currentHP">1</span>/<span id="maxHP">4</span></div>
             </div>
             <div id="itemSlot">
                 <div id="currentItem"></div>
@@ -69,17 +69,17 @@
             <div id="countdown"></div>
             <div id="controlsInfo">
                 <div class="controls-title">Controls</div>
-                <div class="controls-item"><span class="controls-key">W / ↑</span> Accelerate</div>
-                <div class="controls-item"><span class="controls-key">S / ↓</span> Brake/Reverse</div>
-                <div class="controls-item"><span class="controls-key">A / ←</span> Turn Left</div>
-                <div class="controls-item"><span class="controls-key">D / →</span> Turn Right</div>
-                <div class="controls-item"><span class="controls-key">Space</span> Use Item</div>
+                <div class="controls-item"><span class="controls-key">W / ↑</span> Move Up</div>
+                <div class="controls-item"><span class="controls-key">S / ↓</span> Move Down</div>
+                <div class="controls-item"><span class="controls-key">A / ←</span> Move Left</div>
+                <div class="controls-item"><span class="controls-key">D / →</span> Move Right</div>
+                <div class="controls-item"><span class="controls-key">Space</span> Use Ability</div>
             </div>
         </div>
         <canvas id="gameCanvas"></canvas>
-        <div id="raceResults" class="hidden">
+        <div id="gameResults" class="hidden">
             <div class="results-container">
-                <h2>Race Results</h2>
+                <h2>Adventure Results</h2>
                 <div id="resultsContent"></div>
                 <button id="returnToMenuBtn" class="menu-btn">Return to Menu</button>
             </div>
