@@ -76,10 +76,6 @@ function setupEventListeners() {
         }
     });
     
-    document.getElementById('leaderboardBtn').addEventListener('click', async () => {
-        showScreen('leaderboard');
-        await loadLeaderboard();
-    });
     
     document.getElementById('enterHubBtn').addEventListener('click', () => {
         startGame('hub');
@@ -101,11 +97,6 @@ function setupEventListeners() {
         if (networkManager) {
             networkManager.leaveRoom();
         }
-        showScreen('menu');
-    });
-    
-    // Leaderboard
-    document.getElementById('backFromLeaderboardBtn').addEventListener('click', () => {
         showScreen('menu');
     });
     
@@ -211,44 +202,3 @@ function startGame(zoneName, isMultiplayer = false) {
     }
 }
 
-async function loadLeaderboard() {
-    try {
-        const response = await fetch('/api/leaderboard');
-        const data = await response.json();
-        
-        const listEl = document.getElementById('leaderboardList');
-        
-        if (data.length === 0) {
-            listEl.innerHTML = '<p>No records yet. Be the first!</p>';
-            return;
-        }
-        
-        listEl.innerHTML = '';
-        
-        data.forEach((player, index) => {
-            const itemDiv = document.createElement('div');
-            itemDiv.className = 'leaderboard-item';
-            
-            const rankSpan = document.createElement('span');
-            rankSpan.className = 'leaderboard-rank';
-            rankSpan.textContent = index + 1;
-            
-            const nameSpan = document.createElement('span');
-            nameSpan.className = 'leaderboard-name';
-            nameSpan.textContent = player.username;
-            
-            const statsSpan = document.createElement('span');
-            statsSpan.className = 'leaderboard-stats';
-            statsSpan.innerHTML = `High Score: ${player.high_score} | Best: ${player.best_score || 'N/A'}`;
-            
-            itemDiv.appendChild(rankSpan);
-            itemDiv.appendChild(nameSpan);
-            itemDiv.appendChild(statsSpan);
-            
-            listEl.appendChild(itemDiv);
-        });
-    } catch (error) {
-        console.error('Failed to load leaderboard:', error);
-        document.getElementById('leaderboardList').innerHTML = '<p>Failed to load leaderboard</p>';
-    }
-}

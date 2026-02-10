@@ -208,36 +208,3 @@ body {
     border-radius: 5px;
 }
 
-#leaderboardList {
-    background: rgba(255, 255, 255, 0.1);
-    padding: 20px;
-    border-radius: 10px;
-    margin: 20px 0;
-    max-height: 400px;
-    overflow-y: auto;
-}
-
-.leaderboard-item {
-    display: flex;
-    justify-content: space-between;
-    padding: 15px;
-    margin: 5px 0;
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 5px;
-}
-
-.leaderboard-rank {
-    font-weight: bold;
-    font-size: 24px;
-    width: 40px;
-}
-
-.leaderboard-name {
-    flex: 1;
-    text-align: left;
-    padding: 0 15px;
-}
-
-.leaderboard-stats {
-    text-align: right;
-}

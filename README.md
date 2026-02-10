@@ -5,7 +5,7 @@ A browser-based top-down adventure game inspired by Realm of the Mad God, Undert
 ## Features
 
 - **Top-down 2D Exploration**: Realm of the Mad God-style perspective
-- **Multiple Areas**: Dark Forest and Ancient Dungeon with unique layouts
+- **Shared Hub**: A central gathering space for players
 - **Ability System**:
   - ⚔️ Sword Strike - Melee attack
   - 🛡️ Shield Block - Temporary defense
@@ -13,7 +13,6 @@ A browser-based top-down adventure game inspired by Realm of the Mad God, Undert
   - 🔥 Fireball - Ranged magic attack
 - **Single Player**: Explore and battle against enemies
 - **Multiplayer**: Real-time co-op with WebSocket support
-- **Leaderboard**: Track your scores and progress
 - **Responsive Controls**: WASD or Arrow keys + Space for abilities
 
 ## Tech Stack
@@ -29,7 +28,7 @@ A browser-based top-down adventure game inspired by Realm of the Mad God, Undert
 ### Prerequisites
 
 - Node.js 18+
-- PostgreSQL (optional, for leaderboard features)
+- PostgreSQL (optional, for player registration)
 
 ### Installation
 
@@ -94,18 +93,17 @@ npm run dev
 
 ### Game Modes
 
-**Single Player**: Explore areas and fight enemies
+**Single Player**: Explore zones and fight enemies
 
 **Multiplayer**: Co-op with friends in real-time
 
 ### Tips
 
-- Explore areas to find items
+- Explore zones to find items
 - Use abilities strategically
-- Defeat enemies to earn points
 - Avoid enemy attacks
 - Use the shield when overwhelmed
-- Discover secrets in each area
+- Discover secrets in each zone
 
 ## Project Structure
 
@@ -117,7 +115,7 @@ STRICT/
 │   ├── js/
 │   │   ├── game.js            # Main game engine
 │   │   ├── player.js          # Player/character mechanics
-│   │   ├── track.js           # World/area definitions
+│   │   ├── track.js           # Zone definitions
 │   │   ├── items.js           # Ability system
 │   │   ├── network.js         # WebSocket client
 │   │   └── main.js            # UI and app logic
@@ -131,9 +129,7 @@ STRICT/
 ## API Endpoints
 
 - `GET /`: Serve the game
-- `GET /api/leaderboard`: Get top 10 players
 - `POST /api/player`: Register/update player
-- `POST /api/game-result`: Submit game results
 - `WebSocket`: Real-time multiplayer communication
 
 ## Database Schema
@@ -141,17 +137,6 @@ STRICT/
 ### Players Table
 - `id`: Serial primary key
 - `username`: Unique player name
-- `total_games`: Total games completed
-- `high_score`: Cumulative high score across all games
-- `best_score`: Best score in a single game session
-- `created_at`: Timestamp
-
-### Game Results Table
-- `id`: Serial primary key
-- `player_id`: Foreign key to players
-- `area_name`: Name of the area
-- `score`: Points earned
-- `level_reached`: Furthest level reached
 - `created_at`: Timestamp
 
 ## Future Enhancements

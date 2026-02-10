@@ -14,7 +14,6 @@ class Game {
         this.keys = {};
         this.running = false;
         this.gameStarted = false;
-        this.score = 0;
         
         this.cameraX = 0;
         this.cameraY = 0;
@@ -70,7 +69,6 @@ class Game {
         this.lastPortalId = null;
         this.portalCooldown = 0;
         this.keys = {};
-        this.score = 0;
         
         // Create local player
         const colors = ['#3498db', '#e74c3c', '#2ecc71', '#f1c40f', '#9b59b6', '#1abc9c'];
@@ -121,7 +119,7 @@ class Game {
         // Update abilities/hazards
         this.abilityManager.update(this.players);
         
-        // Check enemy defeats and update score
+        // Check enemy defeats
         this.checkEnemyDefeats();
         
         // Update camera (follow local player)
@@ -238,7 +236,6 @@ class Game {
     checkEnemyDefeats() {
         this.enemies = this.enemies.filter(enemy => {
             if (enemy.stunned && enemy.stunnedTime <= 0) {
-                this.score += 100;
                 return false;
             }
             return true;
@@ -257,11 +254,6 @@ class Game {
         if (totalLevelsEl) totalLevelsEl.textContent = this.zone.totalLevels;
         if (currentHPEl) currentHPEl.textContent = Math.max(0, 100 - (this.localPlayer.stunned ? 20 : 0));
         if (maxHPEl) maxHPEl.textContent = '100';
-        
-        // Update score
-        this.score = this.localPlayer.nodesVisited.length * 50;
-        const scoreEl = document.getElementById('gameScore');
-        if (scoreEl) scoreEl.textContent = this.score;
         
         // Update ability display
         const itemEl = document.getElementById('currentItem');
@@ -289,10 +281,6 @@ class Game {
         
         html += `
             <div class="result-item">
-                <span class="result-name">${this.localPlayer.username}</span>
-                <span class="result-score">Score: ${this.score}</span>
-            </div>
-            <div class="result-item">
                 <span class="result-name">Areas Explored</span>
                 <span class="result-score">${this.localPlayer.zoneLevel - 1}</span>
             </div>
@@ -303,19 +291,7 @@ class Game {
         
         document.getElementById('gameResults').classList.remove('hidden');
         
-        // Save result to server
-        if (this.localPlayer) {
-            fetch('/api/game-result', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    username: this.localPlayer.username,
-                    areaName: this.zone.name,
-                    score: this.score,
-                    levelReached: this.localPlayer.zoneLevel - 1
-                })
-            }).catch(err => console.error('Failed to save game result:', err));
-        }
+        // Results are local only for now.
     }
     
     draw() {

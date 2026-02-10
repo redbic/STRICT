@@ -31,20 +31,6 @@ async function initDatabase() {
       CREATE TABLE IF NOT EXISTS players (
         id SERIAL PRIMARY KEY,
         username VARCHAR(50) UNIQUE NOT NULL,
-        total_games INTEGER DEFAULT 0,
-        high_score INTEGER DEFAULT 0,
-        best_score INTEGER,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-    
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS game_results (
-        id SERIAL PRIMARY KEY,
-        player_id INTEGER REFERENCES players(id),
-        area_name VARCHAR(100),
-        score INTEGER,
-        level_reached INTEGER,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
@@ -72,25 +58,6 @@ const apiLimiter = rateLimit({
 app.use('/api/', apiLimiter);
 
 // API Routes
-app.get('/api/leaderboard', async (req, res) => {
-  if (!pool) {
-    return res.json([]);
-  }
-  
-  try {
-    const result = await pool.query(`
-      SELECT username, total_games, high_score, best_score
-      FROM players
-      ORDER BY high_score DESC, best_score DESC
-      LIMIT 10
-    `);
-    res.json(result.rows);
-  } catch (error) {
-    console.error('Leaderboard error:', error);
-    res.status(500).json({ error: 'Database error' });
-  }
-});
-
 app.post('/api/player', async (req, res) => {
   if (!pool) {
     return res.json({ success: true, player: { username: req.body.username } });
@@ -110,48 +77,6 @@ app.post('/api/player', async (req, res) => {
     res.json({ success: true, player: result.rows[0] });
   } catch (error) {
     console.error('Player creation error:', error);
-    res.status(500).json({ error: 'Database error' });
-  }
-});
-
-app.post('/api/game-result', async (req, res) => {
-  if (!pool) {
-    return res.json({ success: true });
-  }
-  
-  const { username, areaName, score, levelReached } = req.body;
-  
-  try {
-    const playerResult = await pool.query(
-      'SELECT id, best_score FROM players WHERE username = $1',
-      [username]
-    );
-    
-    if (playerResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Player not found' });
-    }
-    
-    const player = playerResult.rows[0];
-    
-    const updateQuery = `
-      UPDATE players 
-      SET total_games = total_games + 1,
-          high_score = CASE WHEN high_score IS NULL OR $2 > high_score THEN $2 ELSE high_score END,
-          best_score = CASE WHEN best_score IS NULL OR $2 > best_score THEN $2 ELSE best_score END
-      WHERE id = $1
-    `;
-    
-    await pool.query(updateQuery, [player.id, score]);
-    
-    // Insert game result
-    await pool.query(
-      'INSERT INTO game_results (player_id, area_name, score, level_reached) VALUES ($1, $2, $3, $4)',
-      [player.id, areaName, score, levelReached]
-    );
-    
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Game result error:', error);
     res.status(500).json({ error: 'Database error' });
   }
 });
