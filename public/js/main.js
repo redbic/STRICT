@@ -90,15 +90,6 @@ function setupEventListeners() {
         }
     });
     
-    
-    document.getElementById('enterHubBtn').addEventListener('click', () => {
-        startGame('hub');
-    });
-
-    document.getElementById('backToMenuBtn').addEventListener('click', () => {
-        showScreen('menu');
-    });
-
     document.getElementById('recallBtn').addEventListener('click', () => {
         recallToHub();
     });
@@ -108,7 +99,7 @@ function setupEventListeners() {
         if (networkManager) {
             networkManager.startGame();
         }
-        startGame('hub', true);
+        startGame('hub');
     });
     
     document.getElementById('leaveLobbyBtn').addEventListener('click', () => {
@@ -140,12 +131,12 @@ function setupNetworkHandlers() {
     };
     
     networkManager.onGameStart = (data) => {
-        startGame('hub', true);
+        startGame('hub');
     };
 
     networkManager.onZoneEnter = (data) => {
         if (game && data.zoneId) {
-            game.transitionZone(data.zoneId, true, currentRoomPlayers, networkManager.playerId);
+            game.transitionZone(data.zoneId, currentRoomPlayers, networkManager.playerId);
         }
     };
     
@@ -239,17 +230,17 @@ function updatePlayersList(players) {
     });
 }
 
-function startGame(zoneName, isMultiplayer = false) {
+function startGame(zoneName) {
     if (!game) {
         game = new Game();
     }
     
-    game.init(zoneName, currentUsername, isMultiplayer);
+    game.init(zoneName, currentUsername);
     game.onPortalEnter = (targetZoneId) => {
-        if (isMultiplayer && networkManager) {
+        if (networkManager) {
             networkManager.enterZone(targetZoneId);
         } else {
-            game.transitionZone(targetZoneId, false);
+            console.error('No network connection for portal transition');
         }
     };
     
@@ -257,31 +248,14 @@ function startGame(zoneName, isMultiplayer = false) {
     game.onEnemyKilled = (enemyId, zone) => {
         if (networkManager && networkManager.connected) {
             networkManager.sendEnemyKilled(enemyId, zone);
-        } else {
-            // Fallback: use REST API for single-player or no WebSocket
-            // Note: Reward amount should match ENEMY_KILL_REWARD in server.js (5 coins)
-            fetch('/api/balance/add', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    username: currentUsername,
-                    amount: 5,
-                    reason: 'enemy_kill',
-                    metadata: { game: 'strict1000', enemy: enemyId, zone: zone }
-                })
-            }).then(res => res.json()).then(data => {
-                if (data.balance !== undefined) {
-                    updateBalanceDisplay(data.balance);
-                }
-            }).catch(err => console.error('Balance update failed:', err));
         }
     };
     
     showScreen('game');
     game.start();
     
-    // Send updates to server if multiplayer
-    if (isMultiplayer && networkManager) {
+    // Send updates to server
+    if (networkManager) {
         game.syncMultiplayerPlayers(currentRoomPlayers, networkManager.playerId);
         setInterval(() => {
             if (game.localPlayer && game.running) {
@@ -298,7 +272,7 @@ function recallToHub() {
     if (networkManager) {
         networkManager.enterZone('hub');
     } else {
-        game.transitionZone('hub', false);
+        console.error('No network connection for recall');
     }
 }
 
