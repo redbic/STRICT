@@ -163,6 +163,15 @@ body {
     white-space: nowrap;
 }
 
+.recall-btn {
+    margin-top: 10px;
+    width: 100%;
+    padding: 10px 14px;
+    font-size: 14px;
+    background: linear-gradient(135deg, #6bb7ff 0%, #8ed6ff 100%);
+    color: #0f1b2b;
+}
+
 
 #playersList {
     background: rgba(255, 255, 255, 0.1);

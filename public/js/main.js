@@ -85,6 +85,10 @@ function setupEventListeners() {
         showScreen('menu');
     });
 
+    document.getElementById('recallBtn').addEventListener('click', () => {
+        recallToHub();
+    });
+
     // Lobby
     document.getElementById('startAdventureBtn').addEventListener('click', () => {
         if (networkManager) {
@@ -192,6 +196,17 @@ function startGame(zoneName, isMultiplayer = false) {
                 networkManager.sendPlayerUpdate(game.localPlayer.getState());
             }
         }, 50); // 20 updates per second
+    }
+}
+
+function recallToHub() {
+    if (!game) return;
+    if (game.zone && game.zone.isHub) return;
+
+    if (networkManager) {
+        networkManager.enterZone('hub');
+    } else {
+        game.transitionZone('hub', false);
     }
 }
 
