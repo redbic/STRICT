@@ -1,11 +1,11 @@
-// Player class for kart racing
+// Player class for adventure character
 class Player {
     constructor(x, y, color, id, username) {
         this.x = x;
         this.y = y;
         this.width = 20;
-        this.height = 30;
-        this.color = color || '#ff0000';
+        this.height = 20;
+        this.color = color || '#3498db';
         this.id = id;
         this.username = username || 'Player';
         
@@ -14,18 +14,17 @@ class Player {
         this.velocityY = 0;
         this.angle = 0;
         this.speed = 0;
-        this.maxSpeed = 8;
-        this.acceleration = 0.3;
-        this.friction = 0.95;
-        this.turnSpeed = 0.08;
+        this.maxSpeed = 4;
+        this.acceleration = 0.2;
+        this.friction = 0.85;
         
-        // Race stats
+        // Game stats
         this.lap = 1;
         this.checkpoints = [];
         this.position = 1;
         this.finishTime = null;
         
-        // Items
+        // Abilities
         this.currentItem = null;
         this.itemCooldown = 0;
         this.invincible = false;
@@ -43,36 +42,53 @@ class Player {
             if (this.stunnedTime <= 0) {
                 this.stunned = false;
             }
-            this.speed *= 0.9;
+            this.velocityX *= 0.9;
+            this.velocityY *= 0.9;
         } else {
-            // Handle controls
+            // Handle movement (4-directional top-down)
+            let moveX = 0;
+            let moveY = 0;
+            
             if (keys['ArrowUp'] || keys['w']) {
-                this.speed = Math.min(this.speed + this.acceleration, this.maxSpeed);
-            } else if (keys['ArrowDown'] || keys['s']) {
-                this.speed = Math.max(this.speed - this.acceleration, -this.maxSpeed / 2);
-            } else {
-                this.speed *= this.friction;
+                moveY = -1;
+            }
+            if (keys['ArrowDown'] || keys['s']) {
+                moveY = 1;
+            }
+            if (keys['ArrowLeft'] || keys['a']) {
+                moveX = -1;
+            }
+            if (keys['ArrowRight'] || keys['d']) {
+                moveX = 1;
             }
             
-            if ((keys['ArrowLeft'] || keys['a']) && Math.abs(this.speed) > 0.5) {
-                this.angle -= this.turnSpeed;
+            // Normalize diagonal movement
+            if (moveX !== 0 && moveY !== 0) {
+                moveX *= 0.707;
+                moveY *= 0.707;
             }
-            if ((keys['ArrowRight'] || keys['d']) && Math.abs(this.speed) > 0.5) {
-                this.angle += this.turnSpeed;
+            
+            // Update facing angle
+            if (moveX !== 0 || moveY !== 0) {
+                this.angle = Math.atan2(moveY, moveX);
             }
+            
+            this.velocityX = moveX * this.maxSpeed;
+            this.velocityY = moveY * this.maxSpeed;
         }
         
-        // Speed boost effect
+        // Speed boost (dash) effect
         if (this.speedBoost) {
             this.speedBoostTime--;
             if (this.speedBoostTime <= 0) {
                 this.speedBoost = false;
             } else {
-                this.speed = Math.min(this.speed * 1.5, this.maxSpeed * 1.5);
+                this.velocityX *= 1.8;
+                this.velocityY *= 1.8;
             }
         }
         
-        // Invincibility timer
+        // Invincibility (shield) timer
         if (this.invincible) {
             this.invincibleTime--;
             if (this.invincibleTime <= 0) {
@@ -80,14 +96,13 @@ class Player {
             }
         }
         
-        // Item cooldown
+        // Ability cooldown
         if (this.itemCooldown > 0) {
             this.itemCooldown--;
         }
         
-        // Calculate velocity
-        this.velocityX = Math.cos(this.angle) * this.speed;
-        this.velocityY = Math.sin(this.angle) * this.speed;
+        // Update speed for compatibility
+        this.speed = Math.hypot(this.velocityX, this.velocityY);
         
         // Store old position
         const oldX = this.x;
@@ -97,15 +112,13 @@ class Player {
         this.x += this.velocityX;
         this.y += this.velocityY;
         
-        // Check track collision
+        // Check area collision
         if (track && track.checkCollision(this)) {
-            // Revert position and slow down
             this.x = oldX;
             this.y = oldY;
-            this.speed *= 0.5;
         }
         
-        // Check checkpoints
+        // Check area checkpoints
         if (track) {
             track.checkPlayerCheckpoint(this);
         }
@@ -114,11 +127,13 @@ class Player {
     draw(ctx, cameraX, cameraY) {
         ctx.save();
         
-        // Translate to player position
-        ctx.translate(this.x - cameraX, this.y - cameraY);
-        ctx.rotate(this.angle);
+        const screenX = this.x - cameraX;
+        const screenY = this.y - cameraY;
         
-        // Draw kart body
+        // Draw character body (circle)
+        ctx.beginPath();
+        ctx.arc(screenX, screenY, this.width / 2, 0, Math.PI * 2);
+        
         if (this.invincible) {
             ctx.fillStyle = 'gold';
             ctx.shadowBlur = 15;
@@ -129,27 +144,36 @@ class Player {
             ctx.fillStyle = this.color;
         }
         
-        ctx.fillRect(-this.width/2, -this.height/2, this.width, this.height);
+        ctx.fill();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
         
-        // Draw kart front (direction indicator)
-        ctx.fillStyle = '#333';
-        ctx.fillRect(-this.width/2, -this.height/2, this.width, 10);
+        // Draw direction indicator (small triangle)
+        const dirX = screenX + Math.cos(this.angle) * 14;
+        const dirY = screenY + Math.sin(this.angle) * 14;
+        ctx.beginPath();
+        ctx.arc(dirX, dirY, 3, 0, Math.PI * 2);
+        ctx.fillStyle = '#fff';
+        ctx.fill();
         
         ctx.restore();
         
-        // Draw username above kart
+        // Draw username above character
         ctx.fillStyle = 'white';
         ctx.font = '12px Arial';
         ctx.textAlign = 'center';
-        ctx.fillText(this.username, this.x - cameraX, this.y - cameraY - 25);
+        ctx.fillText(this.username, screenX, screenY - 20);
         
-        // Draw speed boost trail
+        // Draw dash trail
         if (this.speedBoost) {
-            ctx.fillStyle = 'rgba(255, 165, 0, 0.3)';
+            ctx.fillStyle = 'rgba(52, 152, 219, 0.3)';
             for (let i = 1; i <= 3; i++) {
-                const trailX = this.x - Math.cos(this.angle) * 15 * i;
-                const trailY = this.y - Math.sin(this.angle) * 15 * i;
-                ctx.fillRect(trailX - cameraX - 5, trailY - cameraY - 5, 10, 10);
+                const trailX = this.x - Math.cos(this.angle) * 12 * i;
+                const trailY = this.y - Math.sin(this.angle) * 12 * i;
+                ctx.beginPath();
+                ctx.arc(trailX - cameraX, trailY - cameraY, 5, 0, Math.PI * 2);
+                ctx.fill();
             }
         }
     }
@@ -162,20 +186,20 @@ class Player {
         this.itemCooldown = 60;
         
         switch (item.type) {
-            case 'boost':
+            case 'dash':
                 this.speedBoost = true;
-                this.speedBoostTime = 120;
+                this.speedBoostTime = 60;
                 break;
                 
-            case 'shell':
-                // Find nearest player in front
+            case 'sword':
+                // Strike nearest enemy
                 let nearest = null;
                 let minDist = Infinity;
                 
                 targetPlayers.forEach(p => {
                     if (p.id !== this.id) {
                         const dist = Math.hypot(p.x - this.x, p.y - this.y);
-                        if (dist < minDist && dist < 300) {
+                        if (dist < minDist && dist < 200) {
                             minDist = dist;
                             nearest = p;
                         }
@@ -188,17 +212,17 @@ class Player {
                 }
                 break;
                 
-            case 'star':
+            case 'shield':
                 this.invincible = true;
                 this.invincibleTime = 180;
                 break;
                 
-            case 'banana':
-                // Create banana hazard at current position
+            case 'fireball':
+                // Create fireball at current position
                 return {
-                    type: 'banana',
-                    x: this.x,
-                    y: this.y
+                    type: 'fireball',
+                    x: this.x + Math.cos(this.angle) * 30,
+                    y: this.y + Math.sin(this.angle) * 30
                 };
         }
         
