@@ -40,7 +40,7 @@ function setupEventListeners() {
             body: JSON.stringify({ username })
         }).catch(err => console.error('Failed to register player:', err));
         
-        showScreen('trackSelect');
+        showScreen('areaSelect');
     });
     
     document.getElementById('multiPlayerBtn').addEventListener('click', async () => {
@@ -70,7 +70,7 @@ function setupEventListeners() {
                 showScreen('lobby');
             } catch (error) {
                 alert('Failed to connect to server. Playing single player instead.');
-                showScreen('trackSelect');
+                showScreen('areaSelect');
             }
         }
     });
@@ -93,11 +93,11 @@ function setupEventListeners() {
     });
     
     // Lobby
-    document.getElementById('startRaceBtn').addEventListener('click', () => {
+    document.getElementById('startAdventureBtn').addEventListener('click', () => {
         if (networkManager) {
-            networkManager.startRace();
+            networkManager.startGame();
         }
-        startGame('circuit', true);
+        startGame('forest', true);
     });
     
     document.getElementById('leaveLobbyBtn').addEventListener('click', () => {
@@ -112,7 +112,7 @@ function setupEventListeners() {
         showScreen('menu');
     });
     
-    // Race results
+    // Game results
     document.getElementById('returnToMenuBtn').addEventListener('click', () => {
         if (game) {
             game.stop();
@@ -135,17 +135,17 @@ function setupNetworkHandlers() {
         }
     };
     
-    networkManager.onRaceStart = (data) => {
-        startGame('circuit', true);
+    networkManager.onGameStart = (data) => {
+        startGame('forest', true);
     };
     
-    networkManager.onItemUsed = (data) => {
+    networkManager.onAbilityUsed = (data) => {
         if (game) {
             const player = game.players.find(p => p.id === data.playerId);
             if (player) {
                 const result = player.useItem(game.players);
-                if (result && result.type === 'banana') {
-                    game.itemManager.addHazard(result);
+                if (result && result.type === 'fireball') {
+                    game.abilityManager.addHazard(result);
                 }
             }
         }
@@ -217,10 +217,7 @@ async function loadLeaderboard() {
             
             const statsSpan = document.createElement('span');
             statsSpan.className = 'leaderboard-stats';
-            const bestTimeStr = player.best_time 
-                ? `${Math.floor(player.best_time / 60000)}:${((player.best_time % 60000) / 1000).toFixed(1)}`
-                : 'N/A';
-            statsSpan.innerHTML = `Wins: ${player.wins} | Best: ${bestTimeStr}`;
+            statsSpan.innerHTML = `High Score: ${player.high_score} | Best: ${player.best_score || 'N/A'}`;
             
             itemDiv.appendChild(rankSpan);
             itemDiv.appendChild(nameSpan);

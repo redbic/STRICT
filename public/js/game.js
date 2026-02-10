@@ -8,20 +8,21 @@ class Game {
         
         this.players = [];
         this.localPlayer = null;
-        this.track = null;
-        this.itemManager = new ItemManager();
+        this.area = null;
+        this.abilityManager = new ItemManager();
         
         this.keys = {};
         this.running = false;
-        this.raceStarted = false;
-        this.raceStartTime = null;
+        this.gameStarted = false;
+        this.gameStartTime = null;
         this.countdown = 3;
         this.countdownTimer = null;
+        this.score = 0;
         
         this.cameraX = 0;
         this.cameraY = 0;
         
-        this.aiPlayers = [];
+        this.enemies = [];
         
         // Bind keyboard events
         const normalizeKey = (event) => {
@@ -41,12 +42,12 @@ class Game {
                 e.preventDefault();
             }
             
-            // Use item with Space
+            // Use ability with Space
             if (key === ' ') {
                 if (this.localPlayer && this.localPlayer.currentItem) {
-                    const result = this.localPlayer.useItem(this.players);
-                    if (result && result.type === 'banana') {
-                        this.itemManager.addHazard(result);
+                    const result = this.localPlayer.useItem(this.enemies);
+                    if (result && result.type === 'fireball') {
+                        this.abilityManager.addHazard(result);
                     }
                 }
             }
@@ -58,47 +59,48 @@ class Game {
         });
     }
     
-    init(trackName, playerName, isMultiplayer = false) {
-        // Load track
-        const trackData = TRACKS[trackName];
-        if (!trackData) {
-            console.error('Track not found:', trackName);
+    init(areaName, playerName, isMultiplayer = false) {
+        // Load area
+        const areaData = TRACKS[areaName];
+        if (!areaData) {
+            console.error('Area not found:', areaName);
             return;
         }
         
-        this.track = new Track(trackData);
+        this.area = new Track(areaData);
         this.players = [];
-        this.aiPlayers = [];
+        this.enemies = [];
         this.keys = {};
+        this.score = 0;
         
         // Create local player
-        const colors = ['#ff0000', '#0000ff', '#00ff00', '#ffff00', '#ff00ff', '#00ffff'];
+        const colors = ['#3498db', '#e74c3c', '#2ecc71', '#f1c40f', '#9b59b6', '#1abc9c'];
         this.localPlayer = new Player(
-            this.track.startX,
-            this.track.startY,
+            this.area.startX,
+            this.area.startY,
             colors[0],
             'player1',
             playerName
         );
         this.players.push(this.localPlayer);
         
-        // Add AI players for single player
+        // Add enemies for single player
         if (!isMultiplayer) {
             for (let i = 1; i < 4; i++) {
-                const aiPlayer = new Player(
-                    this.track.startX + (i * 40) - 60,
-                    this.track.startY + 50,
+                const enemy = new Player(
+                    this.area.startX + (i * 120) - 180,
+                    this.area.startY + 200,
                     colors[i],
-                    'ai' + i,
-                    'CPU ' + i
+                    'enemy' + i,
+                    'Enemy ' + i
                 );
-                aiPlayer.isAI = true;
-                this.players.push(aiPlayer);
-                this.aiPlayers.push(aiPlayer);
+                enemy.isAI = true;
+                this.players.push(enemy);
+                this.enemies.push(enemy);
             }
         }
         
-        this.raceStarted = false;
+        this.gameStarted = false;
         this.countdown = 3;
         
         // Start countdown
@@ -117,8 +119,8 @@ class Game {
                 countdownEl.textContent = count;
             } else if (count === 0) {
                 countdownEl.textContent = 'GO!';
-                this.raceStarted = true;
-                this.raceStartTime = Date.now();
+                this.gameStarted = true;
+                this.gameStartTime = Date.now();
                 setTimeout(() => {
                     countdownEl.textContent = '';
                 }, 1000);
@@ -128,26 +130,26 @@ class Game {
     }
     
     update() {
-        if (!this.raceStarted) return;
+        if (!this.gameStarted) return;
         
         // Update local player
         if (this.localPlayer) {
-            this.localPlayer.update(this.keys, this.track);
-            this.track.checkItemBox(this.localPlayer, this.itemManager);
+            this.localPlayer.update(this.keys, this.area);
+            this.area.checkItemBox(this.localPlayer, this.abilityManager);
         }
         
-        // Update AI players
-        this.aiPlayers.forEach(ai => {
-            this.updateAI(ai);
-            ai.update({}, this.track);
-            this.track.checkItemBox(ai, this.itemManager);
+        // Update enemies
+        this.enemies.forEach(enemy => {
+            this.updateEnemy(enemy);
+            enemy.update({}, this.area);
+            this.area.checkItemBox(enemy, this.abilityManager);
         });
         
-        // Update items
-        this.itemManager.update(this.players);
+        // Update abilities/hazards
+        this.abilityManager.update(this.players);
         
-        // Update positions
-        this.updatePositions();
+        // Check enemy defeats and update score
+        this.checkEnemyDefeats();
         
         // Update camera (follow local player)
         if (this.localPlayer) {
@@ -158,71 +160,83 @@ class Game {
         // Update UI
         this.updateUI();
         
-        // Check race finish
-        this.checkRaceFinish();
+        // Check game over
+        this.checkGameOver();
     }
     
-    updateAI(ai) {
-        // Simple AI: follow waypoints
-        const checkpoints = this.track.checkpoints;
-        const nextCheckpointIndex = ai.checkpoints.length % checkpoints.length;
-        const target = checkpoints[nextCheckpointIndex];
+    updateEnemy(enemy) {
+        // Simple AI: patrol and chase player
+        if (!this.localPlayer) return;
         
-        const dx = (target.x + target.width/2) - ai.x;
-        const dy = (target.y + target.height/2) - ai.y;
-        const targetAngle = Math.atan2(dy, dx);
+        const dx = this.localPlayer.x - enemy.x;
+        const dy = this.localPlayer.y - enemy.y;
+        const dist = Math.hypot(dx, dy);
         
-        let angleDiff = targetAngle - ai.angle;
-        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+        // Chase player if within range
+        if (dist < 400) {
+            const targetAngle = Math.atan2(dy, dx);
+            
+            let angleDiff = targetAngle - enemy.angle;
+            while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+            while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+            
+            const aiKeys = {
+                'ArrowUp': true,
+                'ArrowLeft': angleDiff < -0.1,
+                'ArrowRight': angleDiff > 0.1
+            };
+            
+            enemy.update(aiKeys, this.area);
+        } else {
+            // Wander randomly
+            if (Math.random() < 0.02) {
+                enemy.angle += (Math.random() - 0.5) * 0.5;
+            }
+            const aiKeys = { 'ArrowUp': Math.random() > 0.3 };
+            enemy.update(aiKeys, this.area);
+        }
         
-        // Simulate key presses
-        const aiKeys = {
-            'ArrowUp': true,
-            'ArrowLeft': angleDiff < -0.1,
-            'ArrowRight': angleDiff > 0.1
-        };
-        
-        ai.update(aiKeys, this.track);
-        
-        // AI uses items randomly
-        if (ai.currentItem && Math.random() < 0.02) {
-            const result = ai.useItem(this.players);
-            if (result && result.type === 'banana') {
-                this.itemManager.addHazard(result);
+        // Enemy uses abilities randomly
+        if (enemy.currentItem && Math.random() < 0.02) {
+            const result = enemy.useItem(this.players);
+            if (result && result.type === 'fireball') {
+                this.abilityManager.addHazard(result);
             }
         }
     }
     
-    updatePositions() {
-        // Sort players by progress (lap and checkpoints)
-        const sortedPlayers = [...this.players].sort((a, b) => {
-            if (a.lap !== b.lap) return b.lap - a.lap;
-            return b.checkpoints.length - a.checkpoints.length;
-        });
-        
-        sortedPlayers.forEach((player, index) => {
-            player.position = index + 1;
+    checkEnemyDefeats() {
+        this.enemies = this.enemies.filter(enemy => {
+            if (enemy.stunned && enemy.stunnedTime <= 0) {
+                this.score += 100;
+                return false;
+            }
+            return true;
         });
     }
     
     updateUI() {
         if (!this.localPlayer) return;
         
-        document.getElementById('currentLap').textContent = Math.min(this.localPlayer.lap, this.track.totalLaps);
-        document.getElementById('totalLaps').textContent = this.track.totalLaps;
-        document.getElementById('position').textContent = this.localPlayer.position;
-        document.getElementById('totalPlayers').textContent = this.players.length;
+        const levelEl = document.getElementById('currentLevel');
+        const totalLevelsEl = document.getElementById('totalLevels');
+        const currentHPEl = document.getElementById('currentHP');
+        const maxHPEl = document.getElementById('maxHP');
         
-        // Update time
-        if (this.raceStartTime) {
-            const elapsed = Date.now() - this.raceStartTime;
-            const minutes = Math.floor(elapsed / 60000);
-            const seconds = Math.floor((elapsed % 60000) / 1000);
-            document.getElementById('raceTime').textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        if (levelEl) levelEl.textContent = Math.min(this.localPlayer.lap, this.area.totalLaps);
+        if (totalLevelsEl) totalLevelsEl.textContent = this.area.totalLaps;
+        if (currentHPEl) currentHPEl.textContent = Math.max(0, 100 - (this.localPlayer.stunned ? 20 : 0));
+        if (maxHPEl) maxHPEl.textContent = '100';
+        
+        // Update score
+        if (this.gameStartTime) {
+            const elapsed = Date.now() - this.gameStartTime;
+            this.score = Math.floor(elapsed / 100) + (this.localPlayer.checkpoints.length * 50);
+            const scoreEl = document.getElementById('gameScore');
+            if (scoreEl) scoreEl.textContent = this.score;
         }
         
-        // Update item display
+        // Update ability display
         const itemEl = document.getElementById('currentItem');
         if (this.localPlayer.currentItem) {
             const itemType = this.localPlayer.currentItem.type;
@@ -232,59 +246,53 @@ class Game {
         }
     }
     
-    checkRaceFinish() {
-        this.players.forEach(player => {
-            if (player.lap > this.track.totalLaps && !player.finishTime) {
-                player.finishTime = Date.now() - this.raceStartTime;
-                
-                if (player === this.localPlayer) {
-                    this.endRace();
-                }
-            }
-        });
+    checkGameOver() {
+        // Check if player has explored all checkpoints and completed the area
+        if (this.localPlayer && this.localPlayer.lap > this.area.totalLaps && !this.localPlayer.finishTime) {
+            this.localPlayer.finishTime = Date.now() - this.gameStartTime;
+            this.endGame();
+        }
     }
     
-    endRace() {
+    endGame() {
         this.running = false;
-        
-        // Sort by finish time
-        const finishedPlayers = this.players
-            .filter(p => p.finishTime)
-            .sort((a, b) => a.finishTime - b.finishTime);
         
         // Show results
         const resultsEl = document.getElementById('resultsContent');
         let html = '<div class="results-list">';
         
-        finishedPlayers.forEach((player, index) => {
-            const minutes = Math.floor(player.finishTime / 60000);
-            const seconds = String(((player.finishTime % 60000) / 1000).toFixed(3)).padStart(6, '0');
-            html += `
-                <div class="result-item">
-                    <span class="result-position">${index + 1}.</span>
-                    <span class="result-name">${player.username}</span>
-                    <span class="result-time">${minutes}:${seconds}</span>
-                </div>
-            `;
-        });
+        html += `
+            <div class="result-item">
+                <span class="result-name">${this.localPlayer.username}</span>
+                <span class="result-score">Score: ${this.score}</span>
+            </div>
+            <div class="result-item">
+                <span class="result-name">Areas Explored</span>
+                <span class="result-score">${this.localPlayer.lap - 1}</span>
+            </div>
+            <div class="result-item">
+                <span class="result-name">Time</span>
+                <span class="result-score">${Math.floor(this.localPlayer.finishTime / 60000)}:${String(((this.localPlayer.finishTime % 60000) / 1000).toFixed(1)).padStart(5, '0')}</span>
+            </div>
+        `;
         
         html += '</div>';
         resultsEl.innerHTML = html;
         
-        document.getElementById('raceResults').classList.remove('hidden');
+        document.getElementById('gameResults').classList.remove('hidden');
         
         // Save result to server
         if (this.localPlayer && this.localPlayer.finishTime) {
-            fetch('/api/race-result', {
+            fetch('/api/game-result', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     username: this.localPlayer.username,
-                    trackName: this.track.name,
-                    raceTime: this.localPlayer.finishTime,
-                    position: this.localPlayer.position
+                    areaName: this.area.name,
+                    score: this.score,
+                    levelReached: this.localPlayer.lap - 1
                 })
-            }).catch(err => console.error('Failed to save race result:', err));
+            }).catch(err => console.error('Failed to save game result:', err));
         }
     }
     
@@ -292,15 +300,15 @@ class Game {
         // Clear canvas
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         
-        // Draw track
-        if (this.track) {
-            this.track.draw(this.ctx, this.cameraX, this.cameraY);
+        // Draw area
+        if (this.area) {
+            this.area.draw(this.ctx, this.cameraX, this.cameraY);
         }
         
-        // Draw items
-        this.itemManager.draw(this.ctx, this.cameraX, this.cameraY);
+        // Draw abilities/effects
+        this.abilityManager.draw(this.ctx, this.cameraX, this.cameraY);
         
-        // Draw players
+        // Draw players and enemies
         this.players.forEach(player => {
             player.draw(this.ctx, this.cameraX, this.cameraY);
         });
