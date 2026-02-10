@@ -165,11 +165,11 @@ const ZONES = {
             { x: 860, y: 660, width: 80, height: 80 }
         ],
         portals: [
-            { id: 'archive_entry', x: 870, y: 610, width: 60, height: 60, label: 'Archive Entry' }
+            { id: 'archive_entry', x: 870, y: 610, width: 60, height: 60, label: 'Hallway' }
         ],
     },
     archive_entry: {
-        name: 'Archive Entry',
+        name: 'Hallway',
         width: 1600,
         height: 1200,
         startX: 800,
