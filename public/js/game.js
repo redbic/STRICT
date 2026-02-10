@@ -33,7 +33,7 @@ class Game {
         window.addEventListener('keydown', (e) => {
             const key = normalizeKey(e);
             this.keys[key] = true;
-            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(key)) {
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'f'].includes(key)) {
                 e.preventDefault();
             }
             
@@ -93,15 +93,11 @@ class Game {
         if (!isMultiplayer && !this.zone.isHub) {
             const enemyCount = this.zone.enemyCount || 3;
             for (let i = 1; i <= enemyCount; i++) {
-                const enemy = new Player(
+                const enemy = new Enemy(
                     this.zone.startX + (i * 120) - 180,
                     this.zone.startY + 200,
-                    colors[i],
-                    'enemy' + i,
-                    'Enemy ' + i
+                    'enemy-' + i
                 );
-                enemy.isAI = true;
-                this.players.push(enemy);
                 this.enemies.push(enemy);
             }
         }
@@ -111,6 +107,10 @@ class Game {
     
     update() {
         if (!this.gameStarted) return;
+
+        if (this.keys['f'] && this.localPlayer) {
+            this.localPlayer.tryAttack(this.enemies);
+        }
         
         // Update local player
         if (this.localPlayer) {
@@ -120,16 +120,14 @@ class Game {
         
         // Update enemies
         this.enemies.forEach(enemy => {
-            this.updateEnemy(enemy);
-            enemy.update({}, this.zone);
-            this.zone.checkPickup(enemy, this.abilityManager);
+            enemy.update(this.zone, this.localPlayer);
         });
         
         // Update abilities/hazards
-        this.abilityManager.update(this.players);
+        this.abilityManager.update([...this.players, ...this.enemies]);
         
         // Check enemy defeats
-        this.checkEnemyDefeats();
+        this.enemies = this.enemies.filter(enemy => enemy.hp > 0);
         
         // Update camera (follow local player)
         if (this.localPlayer) {
@@ -198,56 +196,6 @@ class Game {
         });
     }
     
-    updateEnemy(enemy) {
-        // Simple AI: patrol and chase player
-        if (!this.localPlayer) return;
-        
-        const dx = this.localPlayer.x - enemy.x;
-        const dy = this.localPlayer.y - enemy.y;
-        const dist = Math.hypot(dx, dy);
-        
-        // Chase player if within range
-        if (dist < 400) {
-            const targetAngle = Math.atan2(dy, dx);
-            
-            let angleDiff = targetAngle - enemy.angle;
-            while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-            while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-            
-            const aiKeys = {
-                'ArrowUp': true,
-                'ArrowLeft': angleDiff < -0.1,
-                'ArrowRight': angleDiff > 0.1
-            };
-            
-            enemy.update(aiKeys, this.zone);
-        } else {
-            // Wander randomly
-            if (Math.random() < 0.02) {
-                enemy.angle += (Math.random() - 0.5) * 0.5;
-            }
-            const aiKeys = { 'ArrowUp': Math.random() > 0.3 };
-            enemy.update(aiKeys, this.zone);
-        }
-        
-        // Enemy uses abilities randomly
-        if (enemy.currentItem && Math.random() < 0.02) {
-            const result = enemy.useItem(this.players);
-            if (result && result.type === 'fireball') {
-                this.abilityManager.addHazard(result);
-            }
-        }
-    }
-    
-    checkEnemyDefeats() {
-        this.enemies = this.enemies.filter(enemy => {
-            if (enemy.stunned && enemy.stunnedTime <= 0) {
-                return false;
-            }
-            return true;
-        });
-    }
-    
     updateUI() {
         if (!this.localPlayer) return;
         
@@ -258,8 +206,8 @@ class Game {
         
         if (levelEl) levelEl.textContent = Math.min(this.localPlayer.zoneLevel, this.zone.totalLevels);
         if (totalLevelsEl) totalLevelsEl.textContent = this.zone.totalLevels;
-        if (currentHPEl) currentHPEl.textContent = Math.max(0, 100 - (this.localPlayer.stunned ? 20 : 0));
-        if (maxHPEl) maxHPEl.textContent = '100';
+        if (currentHPEl) currentHPEl.textContent = Math.max(0, this.localPlayer.hp);
+        if (maxHPEl) maxHPEl.textContent = this.localPlayer.maxHp;
         
         // Update ability display
         const itemEl = document.getElementById('currentItem');
@@ -287,6 +235,10 @@ class Game {
         // Draw players and enemies
         this.players.forEach(player => {
             player.draw(this.ctx, this.cameraX, this.cameraY);
+        });
+
+        this.enemies.forEach(enemy => {
+            enemy.draw(this.ctx, this.cameraX, this.cameraY);
         });
     }
     

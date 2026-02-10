@@ -22,6 +22,13 @@ class Player {
         this.zoneLevel = 1;
         this.nodesVisited = [];
         this.position = 1;
+
+        // Combat
+        this.maxHp = 100;
+        this.hp = 100;
+        this.attackDamage = 20;
+        this.attackRange = 40;
+        this.attackCooldown = 0;
         
         // Abilities
         this.currentItem = null;
@@ -98,6 +105,10 @@ class Player {
         // Ability cooldown
         if (this.itemCooldown > 0) {
             this.itemCooldown--;
+        }
+
+        if (this.attackCooldown > 0) {
+            this.attackCooldown--;
         }
         
         // Update speed for compatibility
@@ -226,6 +237,25 @@ class Player {
         }
         
         return true;
+    }
+
+    tryAttack(enemies) {
+        if (this.attackCooldown > 0) return false;
+        this.attackCooldown = 25;
+
+        let hit = false;
+        enemies.forEach(enemy => {
+            const dist = Math.hypot(enemy.x - this.x, enemy.y - this.y);
+            if (dist <= this.attackRange) {
+                enemy.takeDamage(this.attackDamage);
+                hit = true;
+            }
+        });
+        return hit;
+    }
+
+    takeDamage(amount) {
+        this.hp = Math.max(0, this.hp - amount);
     }
     
     getState() {

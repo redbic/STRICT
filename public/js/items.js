@@ -27,18 +27,18 @@ class ItemManager {
         this.hazards = [];
     }
     
-    update(players) {
+    update(entities) {
         // Check hazard collisions
         this.hazards.forEach((hazard, index) => {
-            players.forEach(player => {
-                if (player.invincible) return;
+            entities.forEach(entity => {
+                if (entity.invincible) return;
                 
-                const dist = Math.hypot(player.x - hazard.x, player.y - hazard.y);
+                const dist = Math.hypot(entity.x - hazard.x, entity.y - hazard.y);
                 if (dist < 25) {
                     // Hit by fireball
                     if (hazard.type === 'fireball') {
-                        player.stunned = true;
-                        player.stunnedTime = 60;
+                        entity.stunned = true;
+                        entity.stunnedTime = 60;
                         this.hazards.splice(index, 1);
                     }
                 }
