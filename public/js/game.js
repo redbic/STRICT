@@ -84,9 +84,8 @@ class Game {
         this.players.push(this.localPlayer);
         
         // Add enemies for single player
-        if (!isMultiplayer && this.zone.allowEnemies !== false) {
-            const enemyCount = this.zone.enemyCount || 3;
-            for (let i = 1; i <= enemyCount; i++) {
+        if (!isMultiplayer && Number.isInteger(this.zone.enemyCount) && this.zone.enemyCount > 0) {
+            for (let i = 1; i <= this.zone.enemyCount; i++) {
                 const enemy = new Enemy(
                     this.zone.startX + (i * 120) - 180,
                     this.zone.startY + 200,
@@ -94,10 +93,6 @@ class Game {
                 );
                 this.enemies.push(enemy);
             }
-        }
-
-        if (this.zone.isHub) {
-            this.enemies = [];
         }
         
         this.gameStarted = true;
@@ -116,9 +111,6 @@ class Game {
         }
         
         // Update enemies
-        if (this.zone && this.zone.isHub && this.enemies.length > 0) {
-            this.enemies = [];
-        }
         this.enemies.forEach(enemy => {
             enemy.update(this.zone, this.localPlayer);
         });

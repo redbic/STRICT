@@ -150,7 +150,7 @@ const ZONES = {
         startX: 900,
         startY: 700,
         isHub: true,
-        allowEnemies: false,
+        enemyCount: 0,
         wallColor: '#3a2f2a',
         floorColor: '#1f1a18',
         totalLevels: 1,
