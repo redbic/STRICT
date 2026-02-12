@@ -87,10 +87,10 @@ class Game {
             let didAttack = false;
             if (this.isHost) {
                 // Host applies damage directly
-                didAttack = this.localPlayer.tryAttack(this.enemies);
+                didAttack = this.localPlayer.tryAttack(this.enemies, angle);
             } else {
                 // Non-host sends damage to host via network
-                didAttack = this.attackEnemiesRemote();
+                didAttack = this.attackEnemiesRemote(angle);
             }
             
             // Show attack effect for every swing, with stronger effect on hit
@@ -247,18 +247,25 @@ class Game {
         this.enemies = this.enemies.filter(e => e.hp > 0);
     }
 
-    attackEnemiesRemote() {
+    attackEnemiesRemote(attackAngle) {
         if (!this.localPlayer || this.localPlayer.attackCooldown > 0) return false;
 
-        // Keep cooldown semantics aligned with host/local tryAttack: a swing attempt
-        // consumes cooldown, but we only surface hit feedback when targets are in range.
+        this.localPlayer.attackAngle = attackAngle;
+        this.localPlayer.angle = attackAngle;
         this.localPlayer.attackCooldown = 25;
-        this.localPlayer.attackAnimTimer = 10;
+        this.localPlayer.attackAnimTimer = this.localPlayer.attackAnimTotal;
 
         let sentDamage = false;
         this.enemies.forEach(enemy => {
-            const dist = Math.hypot(enemy.x - this.localPlayer.x, enemy.y - this.localPlayer.y);
-            if (dist <= this.localPlayer.attackRange && this.onEnemyDamage) {
+            const dx = enemy.x - this.localPlayer.x;
+            const dy = enemy.y - this.localPlayer.y;
+            const dist = Math.hypot(dx, dy);
+            const enemyRadius = (enemy.width || 20) / 2;
+            if (dist > this.localPlayer.attackRange + enemyRadius) return;
+
+            const targetAngle = Math.atan2(dy, dx);
+            const angleDelta = Math.abs(this.localPlayer.normalizeAngle(targetAngle - attackAngle));
+            if (angleDelta <= this.localPlayer.attackArc / 2 && this.onEnemyDamage) {
                 this.onEnemyDamage(enemy.id, this.localPlayer.attackDamage);
                 sentDamage = true;
             }
