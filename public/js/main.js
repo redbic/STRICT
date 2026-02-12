@@ -136,10 +136,8 @@ function setupNetworkHandlers() {
         currentRoomPlayers = data.players || [];
         if (game && networkManager) {
             // Only sync players that are in the same zone as the local player
-            const localZoneId = game.zoneId || null;
-            const zonePlayers = localZoneId
-                ? currentRoomPlayers.filter(p => p.zone === localZoneId)
-                : currentRoomPlayers;
+            const localZoneId = game.zoneId || 'hub';
+            const zonePlayers = currentRoomPlayers.filter(p => p.zone === localZoneId);
             game.syncMultiplayerPlayers(zonePlayers, networkManager.playerId);
             hydrateRoomAvatars(zonePlayers);
         }

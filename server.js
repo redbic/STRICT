@@ -256,7 +256,8 @@ function handlePlayerUpdate(ws, data) {
 
     // Find the sending player to determine their zone
     const sender = room.players.find(p => p.id === ws.playerId);
-    const senderZone = sender ? sender.zone : null;
+    if (!sender) return;
+    const senderZone = sender.zone;
 
     // Only send player state to other players in the same zone
     room.players.forEach(player => {
@@ -300,7 +301,7 @@ function handleZoneEnter(ws, data) {
       // Collect players already in the target zone (excluding the transitioning player)
       const zoneMates = room.players
         .filter(p => p.zone === data.zoneId && p.id !== ws.playerId)
-        .map(p => ({ id: p.id, username: p.username }));
+        .map(p => ({ id: p.id, username: p.username, zone: p.zone }));
 
       // Only send the zone transition back to the player who entered the portal
       ws.send(JSON.stringify({
