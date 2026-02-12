@@ -388,9 +388,10 @@ class Player {
         this.stunned = state.stunned;
     }
 
-    interpolateRemote() {
+    interpolateRemote(dt) {
         if (this.targetX === undefined) return;
-        const lerpFactor = 0.3;
+        // Frame-rate independent interpolation: ~87% per 100ms at 60fps
+        const lerpFactor = 1 - Math.pow(0.001, dt);
         this.x += (this.targetX - this.x) * lerpFactor;
         this.y += (this.targetY - this.y) * lerpFactor;
     }

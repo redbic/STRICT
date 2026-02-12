@@ -447,7 +447,8 @@ async function hydrateRoomAvatars(players) {
     const results = await Promise.all(fetches);
     results.forEach((data, i) => {
         if (!data || !data.character || !data.character.dataURL) return;
-        const playerObj = game.players.find(player => player.username === targets[i].username);
+        const targetUsername = targets[i].username;
+        const playerObj = game.players.find(player => player.username === targetUsername);
         if (playerObj) playerObj.setAvatar(data.character.dataURL);
     });
 }

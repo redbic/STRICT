@@ -18,6 +18,7 @@ class Game {
         this.keys = {};
         this.running = false;
         this.gameStarted = false;
+        this.lastFrameTime = 0;
         
         this.cameraX = 0;
         this.cameraY = 0;
@@ -192,7 +193,7 @@ class Game {
         // Interpolate remote players toward their latest server state
         this.players.forEach(player => {
             if (player !== this.localPlayer) {
-                player.interpolateRemote();
+                player.interpolateRemote(this.deltaTime || 1/60);
             }
         });
         
@@ -680,22 +681,26 @@ class Game {
         this.attackFx.timer--;
     }
 
-    gameLoop() {
+    gameLoop(timestamp) {
         if (this.running) {
+            const dt = this.lastFrameTime ? (timestamp - this.lastFrameTime) / 1000 : 1/60;
+            this.lastFrameTime = timestamp;
+            this.deltaTime = Math.min(dt, 0.1); // Cap at 100ms to prevent spiral
+
             try {
                 this.update();
                 this.draw();
             } catch (error) {
                 console.error('Game loop error:', error);
-                // Continue running to prevent total freeze
             }
-            requestAnimationFrame(() => this.gameLoop());
+            requestAnimationFrame((ts) => this.gameLoop(ts));
         }
     }
     
     start() {
         this.running = true;
-        this.gameLoop();
+        this.lastFrameTime = 0;
+        requestAnimationFrame((ts) => this.gameLoop(ts));
     }
     
     stop() {

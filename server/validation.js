@@ -5,13 +5,14 @@ const MAX_PLAYER_ID_LENGTH = 64;
 const MAX_USERNAME_LENGTH = 32;
 const ROOM_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
 const PLAYER_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
-const USERNAME_PATTERN = /^[A-Za-z0-9 _-]+$/;
+const USERNAME_PATTERN = /^[A-Za-z0-9]([A-Za-z0-9 _-]*[A-Za-z0-9])?$/;
 const ALLOWED_ZONE_IDS = new Set(['hub', 'training', 'gallery']);
 const PLAYER_STATE_KEYS = new Set(['id', 'x', 'y', 'angle', 'speed', 'zoneLevel', 'position', 'username', 'stunned']);
 const INVENTORY_MAX_ITEMS = 16;
 
 function normalizeSafeString(value) {
-  return typeof value === 'string' ? value.trim() : '';
+  if (typeof value !== 'string') return '';
+  return value.trim().replace(/\s{2,}/g, ' ');
 }
 
 function isSafeString(value, { minLength = 1, maxLength = 64, pattern = null } = {}) {

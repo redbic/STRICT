@@ -193,7 +193,6 @@ wss.on('connection', (ws) => {
       ws.messageCount++;
       if (ws.messageCount > WS_RATE_LIMIT_MAX_MESSAGES) {
         console.warn('Rate limit exceeded for connection, closing');
-        handleDisconnect(ws);
         ws.close(1008, 'Rate limit exceeded');
         return;
       }
