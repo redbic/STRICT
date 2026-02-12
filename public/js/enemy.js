@@ -1,26 +1,33 @@
 // Enemy class for adventure combat
 class Enemy {
-    constructor(x, y, id) {
+    constructor(x, y, id, options = {}) {
         this.x = x;
         this.y = y;
         this.width = 22;
         this.height = 22;
         this.id = id;
 
-        this.speed = 2.2;
-        this.hp = 50;
-        this.maxHp = 50;
-        this.damage = 8;
+        this.speed = options.speed !== undefined ? options.speed : 2.2;
+        this.hp = options.hp !== undefined ? options.hp : 50;
+        this.maxHp = options.maxHp !== undefined ? options.maxHp : 50;
+        this.damage = options.damage !== undefined ? options.damage : 8;
         this.attackRange = 28;
         this.aggroRange = 320;
         this.attackCooldown = 0;
         this.stunned = false;
         this.stunnedTime = 0;
         this.invincible = false;
+        
+        // Training dummy options
+        this.stationary = options.stationary || false;
+        this.passive = options.passive || false;
     }
 
     update(zone, target) {
         if (!target) return;
+        
+        // Stationary enemies don't move
+        if (this.stationary) return;
 
         if (this.stunned) {
             this.stunnedTime--;
@@ -49,7 +56,7 @@ class Enemy {
                     this.x = oldX;
                     this.y = oldY;
                 }
-            } else if (this.attackCooldown <= 0) {
+            } else if (this.attackCooldown <= 0 && !this.passive) {
                 target.takeDamage(this.damage);
                 this.attackCooldown = 45;
             }

@@ -109,6 +109,20 @@ class Game {
         this.portalCooldown = 0;
         this.keys = {};
         
+        // Spawn enemies from zone data
+        if (zoneData.enemies && Array.isArray(zoneData.enemies)) {
+            zoneData.enemies.forEach((enemyData, index) => {
+                const enemyId = `${zoneName}-enemy-${index}`;
+                const enemy = new Enemy(enemyData.x, enemyData.y, enemyId, {
+                    stationary: enemyData.stationary,
+                    passive: enemyData.passive,
+                    hp: enemyData.hp,
+                    maxHp: enemyData.maxHp
+                });
+                this.enemies.push(enemy);
+            });
+        }
+        
         // Create local player
         const colors = ['#3498db', '#e74c3c', '#2ecc71', '#f1c40f', '#9b59b6', '#1abc9c'];
         this.localPlayer = new Player(

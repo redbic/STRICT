@@ -195,6 +195,8 @@ const ZONES = {
             { id: 'archive_entry', x: 870, y: 610, width: 60, height: 60, label: 'The Archive' },
             // Room 102 also points to archive_entry since it's the only combat zone currently
             { id: 'archive_entry', x: 400, y: 350, width: 60, height: 60, label: 'Room 102' },
+            // Training room portal
+            { id: 'training', x: 400, y: 900, width: 60, height: 60, label: 'Training' },
             // Placeholder portal for future content - locked to prevent entry
             { id: 'room_237_placeholder', x: 1340, y: 350, width: 60, height: 60, label: 'Room 237 (Locked)', locked: true }
         ],
@@ -227,5 +229,29 @@ const ZONES = {
         portals: [
             { id: 'hub', x: 770, y: 1080, width: 60, height: 60, label: 'Return to Lobby' }
         ],
+    },
+    training: {
+        name: 'Training',
+        width: 1000,
+        height: 800,
+        startX: 500,
+        startY: 700,
+        wallColor: '#3a3a3a',
+        floorColor: '#2a2a2a',
+        totalLevels: 1,
+        enemyCount: 1,
+        walls: [
+            // Outer boundary
+            { x: 0, y: 0, width: 1000, height: 40 },
+            { x: 0, y: 0, width: 40, height: 800 },
+            { x: 0, y: 760, width: 1000, height: 40 },
+            { x: 960, y: 0, width: 40, height: 800 }
+        ],
+        portals: [
+            { id: 'hub', x: 470, y: 720, width: 60, height: 60, label: 'Return to Lobby' }
+        ],
+        enemies: [
+            { x: 500, y: 400, stationary: true, passive: true, hp: 100, maxHp: 100 }
+        ]
     }
 };
