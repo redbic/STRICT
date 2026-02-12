@@ -158,7 +158,8 @@ function handleJoinRoom(ws, data) {
     gameRooms.set(roomId, {
       players: [],
       started: false,
-      killedEnemies: new Set() // Track killed enemies to prevent double-rewards
+      killedEnemies: new Set(), // Track killed enemies to prevent double-rewards
+      respawnTimers: new Map() // Track respawn timers for enemies
     });
   }
   
@@ -277,6 +278,34 @@ async function handleEnemyKilled(ws, data) {
       type: 'balance_update',
       balance: newBalance
     }));
+  }
+  
+  // Schedule enemy respawn for training dummies (10 second timer)
+  if (zone === 'Training') {
+    const respawnDelay = 10000; // 10 seconds
+    
+    // Clear any existing timer for this enemy
+    if (room.respawnTimers.has(enemyKey)) {
+      clearTimeout(room.respawnTimers.get(enemyKey));
+    }
+    
+    // Schedule respawn
+    const timerId = setTimeout(() => {
+      // Remove from killed enemies so it can be killed again
+      room.killedEnemies.delete(enemyKey);
+      
+      // Broadcast respawn to all players in room
+      broadcastToRoom(ws.roomId, {
+        type: 'enemy_respawn',
+        enemyId: enemyId,
+        zone: zone
+      });
+      
+      // Clean up timer reference
+      room.respawnTimers.delete(enemyKey);
+    }, respawnDelay);
+    
+    room.respawnTimers.set(enemyKey, timerId);
   }
 }
 

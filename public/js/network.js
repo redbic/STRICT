@@ -12,6 +12,7 @@ class NetworkManager {
         this.onRoomFull = null;
         this.onZoneEnter = null;
         this.onBalanceUpdate = null; // Callback for balance updates
+        this.onEnemyRespawn = null; // Callback for enemy respawns
     }
     
     connect() {
@@ -70,6 +71,9 @@ class NetworkManager {
                 break;
             case 'balance_update':
                 if (this.onBalanceUpdate) this.onBalanceUpdate(data);
+                break;
+            case 'enemy_respawn':
+                if (this.onEnemyRespawn) this.onEnemyRespawn(data);
                 break;
         }
     }

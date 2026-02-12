@@ -144,6 +144,27 @@ function setupNetworkHandlers() {
         updateBalanceDisplay(data.balance);
     };
     
+    networkManager.onEnemyRespawn = (data) => {
+        if (game && data.enemyId && data.zone) {
+            // Re-add the enemy to the game
+            const zoneData = ZONES[data.zone.toLowerCase()];
+            if (zoneData && zoneData.enemies) {
+                // Find the enemy config
+                const enemyIndex = parseInt(data.enemyId.split('-').pop());
+                const enemyConfig = zoneData.enemies[enemyIndex];
+                if (enemyConfig) {
+                    const enemy = new Enemy(enemyConfig.x, enemyConfig.y, data.enemyId, {
+                        stationary: enemyConfig.stationary,
+                        passive: enemyConfig.passive,
+                        hp: enemyConfig.hp,
+                        maxHp: enemyConfig.maxHp
+                    });
+                    game.enemies.push(enemy);
+                }
+            }
+        }
+    };
+    
     networkManager.onPlayerLeft = (data) => {
         if (game) {
             game.players = game.players.filter(p => p.id !== data.playerId);
