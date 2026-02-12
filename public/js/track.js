@@ -15,6 +15,34 @@ class Zone {
         this.decorations = zoneData.decorations || null;
         this.ruleset = zoneData.ruleset || 'standard';
         this.visibilityRadius = zoneData.visibilityRadius || null;
+        
+        // Performance optimization: cache time-based values
+        this.lastClockUpdate = 0;
+        this.cachedClockAngles = { hour: 0, minute: 0 };
+        
+        // Performance optimization: pre-render chandelier glow
+        this.chandelierCanvas = null;
+        if (this.decorations && this.decorations.chandelier) {
+            this.chandelierCanvas = this.createChandelierGlow();
+        }
+    }
+    
+    createChandelierGlow() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 600;
+        canvas.height = 600;
+        const ctx = canvas.getContext('2d');
+        
+        // Create gradient centered in the canvas
+        const gradient = ctx.createRadialGradient(300, 300, 0, 300, 300, 300);
+        gradient.addColorStop(0, 'rgba(255, 230, 150, 0.3)');
+        gradient.addColorStop(0.5, 'rgba(255, 230, 150, 0.1)');
+        gradient.addColorStop(1, 'rgba(255, 230, 150, 0)');
+        
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, 600, 600);
+        
+        return canvas;
     }
     
     draw(ctx, cameraX, cameraY) {
@@ -219,6 +247,15 @@ class Zone {
         const clockX = clock.x - cameraX;
         const clockY = clock.y - cameraY;
         
+        // Update clock angles only once per second (performance optimization)
+        const now = Date.now();
+        if (now - this.lastClockUpdate > 1000) {
+            const time = new Date();
+            this.cachedClockAngles.hour = (time.getHours() % 12) * (Math.PI / 6);
+            this.cachedClockAngles.minute = time.getMinutes() * (Math.PI / 30);
+            this.lastClockUpdate = now;
+        }
+        
         // Clock body (tall rectangle)
         ctx.fillStyle = '#6b4e3d'; // Dark wood
         ctx.fillRect(clockX - 20, clockY, 40, 150);
@@ -229,27 +266,23 @@ class Zone {
         ctx.arc(clockX, clockY + 30, 25, 0, Math.PI * 2);
         ctx.fill();
         
-        // Clock hands (simple lines) - shows real time
-        const time = new Date();
-        const hourAngle = (time.getHours() % 12) * (Math.PI / 6);
-        const minuteAngle = time.getMinutes() * (Math.PI / 30);
-        
+        // Clock hands (simple lines) - uses cached angles
         ctx.strokeStyle = '#000';
         ctx.lineWidth = 2;
         // Hour hand
         ctx.beginPath();
         ctx.moveTo(clockX, clockY + 30);
         ctx.lineTo(
-            clockX + Math.sin(hourAngle) * 12,
-            clockY + 30 - Math.cos(hourAngle) * 12
+            clockX + Math.sin(this.cachedClockAngles.hour) * 12,
+            clockY + 30 - Math.cos(this.cachedClockAngles.hour) * 12
         );
         ctx.stroke();
         // Minute hand
         ctx.beginPath();
         ctx.moveTo(clockX, clockY + 30);
         ctx.lineTo(
-            clockX + Math.sin(minuteAngle) * 18,
-            clockY + 30 - Math.cos(minuteAngle) * 18
+            clockX + Math.sin(this.cachedClockAngles.minute) * 18,
+            clockY + 30 - Math.cos(this.cachedClockAngles.minute) * 18
         );
         ctx.stroke();
     }
@@ -259,17 +292,10 @@ class Zone {
         const chandelierX = chandelier.x - cameraX;
         const chandelierY = chandelier.y - cameraY;
         
-        // Radial gradient glow
-        const gradient = ctx.createRadialGradient(
-            chandelierX, chandelierY, 0,
-            chandelierX, chandelierY, 300
-        );
-        gradient.addColorStop(0, 'rgba(255, 230, 150, 0.3)');
-        gradient.addColorStop(0.5, 'rgba(255, 230, 150, 0.1)');
-        gradient.addColorStop(1, 'rgba(255, 230, 150, 0)');
-        
-        ctx.fillStyle = gradient;
-        ctx.fillRect(chandelierX - 300, chandelierY - 300, 600, 600);
+        // Use pre-rendered glow canvas (performance optimization)
+        if (this.chandelierCanvas) {
+            ctx.drawImage(this.chandelierCanvas, chandelierX - 300, chandelierY - 300);
+        }
         
         // Simple chandelier sprite (circles + lines)
         ctx.fillStyle = '#d4a745';

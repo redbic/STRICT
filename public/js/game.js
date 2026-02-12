@@ -25,6 +25,10 @@ class Game {
         this.isHost = false; // Whether this client is the host (authoritative for enemies)
         this.onEnemyDamage = null; // Callback for sending enemy damage to host (non-host players)
         
+        // Performance optimization: cache darkness overlay canvas
+        this.darknessCanvas = null;
+        this.lastVisibilityRadius = 0;
+        
         // Bind keyboard events
         const normalizeKey = (event) => {
             if (event.code === 'Space' || event.key === ' ' || event.key === 'Spacebar') {
@@ -379,8 +383,34 @@ class Game {
         }
     }
     
+    
+    createDarknessCanvas(radius) {
+        const canvas = document.createElement('canvas');
+        const size = radius * 2 + 100; // Add margin for gradient
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        
+        const center = size / 2;
+        const gradient = ctx.createRadialGradient(center, center, 0, center, center, radius);
+        gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+        gradient.addColorStop(0.7, 'rgba(0, 0, 0, 0.3)');
+        gradient.addColorStop(1, 'rgba(0, 0, 0, 0.95)');
+        
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, size, size);
+        
+        return canvas;
+    }
+    
     drawDarknessOverlay() {
         if (!this.zone.visibilityRadius) return;
+        
+        // Create or update darkness canvas if visibility radius changed
+        if (!this.darknessCanvas || this.lastVisibilityRadius !== this.zone.visibilityRadius) {
+            this.darknessCanvas = this.createDarknessCanvas(this.zone.visibilityRadius);
+            this.lastVisibilityRadius = this.zone.visibilityRadius;
+        }
         
         const playerScreenX = this.localPlayer.x - this.cameraX;
         const playerScreenY = this.localPlayer.y - this.cameraY;
@@ -388,23 +418,18 @@ class Game {
         // Save context
         this.ctx.save();
         
-        // Create a radial gradient for the visibility circle
-        const gradient = this.ctx.createRadialGradient(
-            playerScreenX, playerScreenY, 0,
-            playerScreenX, playerScreenY, this.zone.visibilityRadius
-        );
-        gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
-        gradient.addColorStop(0.7, 'rgba(0, 0, 0, 0.3)');
-        gradient.addColorStop(1, 'rgba(0, 0, 0, 0.95)');
-        
         // Draw darkness over everything
         this.ctx.fillStyle = 'rgba(0, 0, 0, 0.95)';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         
-        // Cut out the visibility circle using compositing
+        // Cut out the visibility circle using pre-rendered canvas
         this.ctx.globalCompositeOperation = 'destination-out';
-        this.ctx.fillStyle = gradient;
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        const halfSize = this.darknessCanvas.width / 2;
+        this.ctx.drawImage(
+            this.darknessCanvas,
+            playerScreenX - halfSize,
+            playerScreenY - halfSize
+        );
         
         // Restore context
         this.ctx.globalCompositeOperation = 'source-over';
