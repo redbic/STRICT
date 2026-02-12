@@ -28,6 +28,7 @@ class Game {
         // Performance optimization: cache darkness overlay canvas
         this.darknessCanvas = null;
         this.lastVisibilityRadius = 0;
+        this.playerGlowCanvas = null; // Cache player glow effect
         
         // Bind keyboard events
         const normalizeKey = (event) => {
@@ -403,6 +404,33 @@ class Game {
         return canvas;
     }
     
+    createPlayerGlowCanvas() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 80;
+        canvas.height = 80;
+        const ctx = canvas.getContext('2d');
+        
+        const center = 40;
+        
+        // Draw glowing dot
+        ctx.fillStyle = 'rgba(100, 200, 255, 0.8)';
+        ctx.beginPath();
+        ctx.arc(center, center, 8, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Draw glow effect
+        const gradient = ctx.createRadialGradient(center, center, 0, center, center, 30);
+        gradient.addColorStop(0, 'rgba(100, 200, 255, 0.5)');
+        gradient.addColorStop(1, 'rgba(100, 200, 255, 0)');
+        
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(center, center, 30, 0, Math.PI * 2);
+        ctx.fill();
+        
+        return canvas;
+    }
+    
     drawDarknessOverlay() {
         if (!this.zone.visibilityRadius) return;
         
@@ -410,6 +438,11 @@ class Game {
         if (!this.darknessCanvas || this.lastVisibilityRadius !== this.zone.visibilityRadius) {
             this.darknessCanvas = this.createDarknessCanvas(this.zone.visibilityRadius);
             this.lastVisibilityRadius = this.zone.visibilityRadius;
+        }
+        
+        // Create player glow canvas if not exists
+        if (!this.playerGlowCanvas) {
+            this.playerGlowCanvas = this.createPlayerGlowCanvas();
         }
         
         const playerScreenX = this.localPlayer.x - this.cameraX;
@@ -434,31 +467,19 @@ class Game {
         // Restore context
         this.ctx.globalCompositeOperation = 'source-over';
         
-        // Draw glowing dots for other players
+        // Draw glowing dots for other players using cached canvas
         this.players.forEach(player => {
             if (player.id === this.localPlayer.id) return; // Skip local player
             
             const otherScreenX = player.x - this.cameraX;
             const otherScreenY = player.y - this.cameraY;
             
-            // Glowing dot for co-op partners
-            this.ctx.fillStyle = 'rgba(100, 200, 255, 0.8)';
-            this.ctx.beginPath();
-            this.ctx.arc(otherScreenX, otherScreenY, 8, 0, Math.PI * 2);
-            this.ctx.fill();
-            
-            // Glow effect
-            const playerGlow = this.ctx.createRadialGradient(
-                otherScreenX, otherScreenY, 0,
-                otherScreenX, otherScreenY, 30
+            // Draw pre-rendered player glow
+            this.ctx.drawImage(
+                this.playerGlowCanvas,
+                otherScreenX - 40,
+                otherScreenY - 40
             );
-            playerGlow.addColorStop(0, 'rgba(100, 200, 255, 0.5)');
-            playerGlow.addColorStop(1, 'rgba(100, 200, 255, 0)');
-            
-            this.ctx.fillStyle = playerGlow;
-            this.ctx.beginPath();
-            this.ctx.arc(otherScreenX, otherScreenY, 30, 0, Math.PI * 2);
-            this.ctx.fill();
         });
         
         this.ctx.restore();
