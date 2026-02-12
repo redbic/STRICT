@@ -146,6 +146,9 @@ wss.on('connection', (ws) => {
         case 'enemy_damage':
           handleEnemyDamage(ws, data);
           break;
+        case 'list_rooms':
+          handleListRooms(ws);
+          break;
       }
     } catch (error) {
       console.error('WebSocket message error:', error);
@@ -201,6 +204,9 @@ function handleJoinRoom(ws, data) {
     roomId: roomId,
     hostId: room.hostId
   });
+  
+  // Notify unjoined clients about updated room list
+  broadcastRoomList();
 }
 
 function handleLeaveRoom(ws, data) {
@@ -228,6 +234,9 @@ function handleLeaveRoom(ws, data) {
         });
       }
     }
+    
+    // Notify unjoined clients about updated room list
+    broadcastRoomList();
   }
 }
 
@@ -250,6 +259,9 @@ function handleGameStart(ws, data) {
         type: 'game_start',
         timestamp: Date.now()
       });
+      
+      // Room no longer available for joining
+      broadcastRoomList();
     }
   }
 }
@@ -390,8 +402,43 @@ function handleDisconnect(ws) {
           playerId: ws.playerId
         });
       }
+      
+      // Notify unjoined clients about updated room list
+      broadcastRoomList();
     }
   }
+}
+
+function handleListRooms(ws) {
+  ws.send(JSON.stringify({
+    type: 'room_list',
+    rooms: getAvailableRooms()
+  }));
+}
+
+function getAvailableRooms() {
+  const rooms = [];
+  for (const [roomId, room] of gameRooms) {
+    if (!room.started && room.players.length < MAX_PARTY_SIZE) {
+      rooms.push({
+        roomId: roomId,
+        playerCount: room.players.length,
+        maxPlayers: MAX_PARTY_SIZE,
+        players: room.players.map(p => p.username)
+      });
+    }
+  }
+  return rooms;
+}
+
+function broadcastRoomList() {
+  const rooms = getAvailableRooms();
+  const message = JSON.stringify({ type: 'room_list', rooms: rooms });
+  wss.clients.forEach(client => {
+    if (client.readyState === WebSocket.OPEN && !client.roomId) {
+      client.send(message);
+    }
+  });
 }
 
 function broadcastToRoom(roomId, message, excludeWs = null) {

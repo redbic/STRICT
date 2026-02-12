@@ -26,8 +26,13 @@
             <div class="menu-content">
                 <input type="text" id="username" placeholder="Enter your name" maxlength="20">
                 <button id="confirmNameBtn" class="menu-btn">Confirm</button>
-                <input type="text" id="joinRoomInput" placeholder="Room code (leave empty to create)" maxlength="30">
-                <button id="multiPlayerBtn" class="menu-btn">Multiplayer</button>
+                <button id="multiPlayerBtn" class="menu-btn">Create Lobby</button>
+            </div>
+            <div id="roomBrowser" class="room-browser" style="display:none;">
+                <h3>Available Lobbies</h3>
+                <div id="roomList" class="room-list">
+                    <p class="room-list-empty">No lobbies available</p>
+                </div>
             </div>
         </div>
     </div>
