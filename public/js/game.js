@@ -90,8 +90,7 @@ class Game {
                 didAttack = this.localPlayer.tryAttack(this.enemies);
             } else {
                 // Non-host sends damage to host via network
-                this.attackEnemiesRemote();
-                didAttack = true; // Assume success for visual feedback
+                didAttack = this.attackEnemiesRemote();
             }
             
             // Show attack effect only if attack was attempted
@@ -249,15 +248,22 @@ class Game {
     }
 
     attackEnemiesRemote() {
-        if (!this.localPlayer || this.localPlayer.attackCooldown > 0) return;
+        if (!this.localPlayer || this.localPlayer.attackCooldown > 0) return false;
+
+        // Keep cooldown semantics aligned with host/local tryAttack: a swing attempt
+        // consumes cooldown, but we only surface hit feedback when targets are in range.
         this.localPlayer.attackCooldown = 25;
-        
+
+        let sentDamage = false;
         this.enemies.forEach(enemy => {
             const dist = Math.hypot(enemy.x - this.localPlayer.x, enemy.y - this.localPlayer.y);
             if (dist <= this.localPlayer.attackRange && this.onEnemyDamage) {
                 this.onEnemyDamage(enemy.id, this.localPlayer.attackDamage);
+                sentDamage = true;
             }
         });
+
+        return sentDamage;
     }
 
     handlePortalTransitions() {
