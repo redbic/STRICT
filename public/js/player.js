@@ -6,8 +6,10 @@ const PLAYER_ACCELERATION = 0.2;
 const PLAYER_FRICTION = 0.85;
 const PLAYER_DEFAULT_HP = 100;
 const PLAYER_ATTACK_DAMAGE = 20;
-const PLAYER_ATTACK_RANGE = 40;
+const PLAYER_ATTACK_RANGE = 76;
+const PLAYER_ATTACK_ARC = Math.PI * 0.9;
 const PLAYER_ATTACK_COOLDOWN_FRAMES = 25;
+const PLAYER_ATTACK_ANIM_FRAMES = 12;
 const PLAYER_SIZE = 20;
 
 class Player {
@@ -49,8 +51,19 @@ class Player {
         this.hp = PLAYER_DEFAULT_HP;
         this.attackDamage = PLAYER_ATTACK_DAMAGE;
         this.attackRange = PLAYER_ATTACK_RANGE;
+        this.attackArc = PLAYER_ATTACK_ARC;
         this.attackCooldown = 0;
+        this.attackCooldownFrames = PLAYER_ATTACK_COOLDOWN_FRAMES;
         this.attackAnimTimer = 0;
+        this.attackAnimTotal = PLAYER_ATTACK_ANIM_FRAMES;
+        this.attackAngle = 0;
+
+        // Simple weapon model: handle + blade rendered from hand pivot.
+        this.weapon = {
+            gripOffset: 7,
+            bladeLength: 40,
+            bladeWidth: 5
+        };
         
         // Status
         this.stunned = false;
@@ -211,17 +224,44 @@ class Player {
         ctx.lineTo(screenX + 3 - stride, bodyY + 10);
         ctx.stroke();
 
-        // Weapon hand poke during attack
-        if (this.attackAnimTimer > 0) {
-            const attackProgress = 1 - (this.attackAnimTimer / 10);
-            const handReach = 6 + Math.sin(attackProgress * Math.PI) * 6;
-            const handX = screenX + Math.cos(this.angle) * handReach;
-            const handY = bodyY + Math.sin(this.angle) * handReach;
-            ctx.fillStyle = '#ffe3d2';
-            ctx.beginPath();
-            ctx.arc(handX, handY, 2, 0, Math.PI * 2);
-            ctx.fill();
-        }
+        const activeAngle = this.getCurrentAttackAngle();
+        const handX = screenX + Math.cos(activeAngle) * this.weapon.gripOffset;
+        const handY = bodyY + Math.sin(activeAngle) * this.weapon.gripOffset;
+
+        // Back hand for readability
+        const offHandAngle = activeAngle + Math.PI * 0.65;
+        ctx.fillStyle = '#ffd9c3';
+        ctx.beginPath();
+        ctx.arc(screenX + Math.cos(offHandAngle) * 5, bodyY + Math.sin(offHandAngle) * 4, 2, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Weapon handle
+        const pommelX = handX - Math.cos(activeAngle) * 4;
+        const pommelY = handY - Math.sin(activeAngle) * 4;
+        const bladeTipX = handX + Math.cos(activeAngle) * this.weapon.bladeLength;
+        const bladeTipY = handY + Math.sin(activeAngle) * this.weapon.bladeLength;
+
+        ctx.strokeStyle = '#6e4a2e';
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(pommelX, pommelY);
+        ctx.lineTo(handX + Math.cos(activeAngle) * 7, handY + Math.sin(activeAngle) * 7);
+        ctx.stroke();
+
+        // Weapon blade
+        ctx.strokeStyle = this.attackAnimTimer > 0 ? '#dff5ff' : '#b8c7d4';
+        ctx.lineWidth = this.weapon.bladeWidth;
+        ctx.beginPath();
+        ctx.moveTo(handX + Math.cos(activeAngle) * 7, handY + Math.sin(activeAngle) * 7);
+        ctx.lineTo(bladeTipX, bladeTipY);
+        ctx.stroke();
+
+        // Hand on top of grip
+        ctx.fillStyle = '#ffe3d2';
+        ctx.beginPath();
+        ctx.arc(handX, handY, 2.2, 0, Math.PI * 2);
+        ctx.fill();
 
         ctx.restore();
         
@@ -259,20 +299,49 @@ class Player {
      * @param {Array<Enemy>} enemies - Array of enemies to check
      * @returns {boolean} True if an enemy was hit
      */
-    tryAttack(enemies) {
+    tryAttack(enemies, attackAngle = this.angle) {
         if (this.attackCooldown > 0) return false;
-        this.attackCooldown = PLAYER_ATTACK_COOLDOWN_FRAMES;
-        this.attackAnimTimer = 10;
+
+        this.attackAngle = attackAngle;
+        this.angle = attackAngle;
+        this.attackCooldown = this.attackCooldownFrames;
+        this.attackAnimTimer = this.attackAnimTotal;
 
         let hit = false;
         enemies.forEach(enemy => {
-            const dist = Math.hypot(enemy.x - this.x, enemy.y - this.y);
-            if (dist <= this.attackRange) {
+            const dx = enemy.x - this.x;
+            const dy = enemy.y - this.y;
+            const dist = Math.hypot(dx, dy);
+            const enemyRadius = (enemy.width || 20) / 2;
+            if (dist > this.attackRange + enemyRadius) {
+                return;
+            }
+
+            const targetAngle = Math.atan2(dy, dx);
+            const angleDelta = Math.abs(this.normalizeAngle(targetAngle - attackAngle));
+            if (angleDelta <= this.attackArc / 2) {
                 enemy.takeDamage(this.attackDamage);
                 hit = true;
             }
         });
         return hit;
+    }
+
+    getCurrentAttackAngle() {
+        if (this.attackAnimTimer <= 0) {
+            return this.angle;
+        }
+
+        const progress = 1 - (this.attackAnimTimer / this.attackAnimTotal);
+        const startAngle = this.attackAngle - (this.attackArc * 0.55);
+        return startAngle + (this.attackArc * progress);
+    }
+
+    normalizeAngle(angle) {
+        let normalized = angle;
+        while (normalized > Math.PI) normalized -= Math.PI * 2;
+        while (normalized < -Math.PI) normalized += Math.PI * 2;
+        return normalized;
     }
     /**
      * Apply damage to player
