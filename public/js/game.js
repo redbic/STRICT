@@ -3,6 +3,7 @@ class Game {
     constructor() {
         this.canvas = document.getElementById('gameCanvas');
         this.ctx = this.canvas.getContext('2d');
+        this.gameContainer = document.getElementById('game');
         this.resizeCanvas();
         
         this.players = [];
@@ -117,7 +118,8 @@ class Game {
         window.addEventListener('mousemove', this.handleMouseMove);
         window.addEventListener('mousedown', this.handleMouseDown);
         window.addEventListener('resize', this.handleResize);
-        this.canvas.addEventListener('contextmenu', this.handleContextMenu);
+        // Prevent context menu on game container to avoid accidental triggers during intense gameplay
+        this.gameContainer.addEventListener('contextmenu', this.handleContextMenu);
     }
 
     resizeCanvas() {
@@ -612,6 +614,6 @@ class Game {
         window.removeEventListener('mousemove', this.handleMouseMove);
         window.removeEventListener('mousedown', this.handleMouseDown);
         window.removeEventListener('resize', this.handleResize);
-        this.canvas.removeEventListener('contextmenu', this.handleContextMenu);
+        this.gameContainer.removeEventListener('contextmenu', this.handleContextMenu);
     }
 }
