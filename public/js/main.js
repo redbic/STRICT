@@ -623,6 +623,12 @@ function recallToHub() {
     if (!game) return;
     if (game.zone && game.zone.isHub) return;
 
+    // If player is dead, handle respawn first
+    if (game.localPlayer && game.localPlayer.isDead) {
+        game.hideDeathScreen();
+        game.localPlayer.respawn();
+    }
+
     if (networkManager) {
         networkManager.enterZone('hub');
     } else {

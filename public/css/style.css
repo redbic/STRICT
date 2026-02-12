@@ -213,6 +213,7 @@ body {
     font-size: 14px;
     line-height: 1.4;
     max-width: 220px;
+    z-index: 1001;
 }
 
 .hotbar {

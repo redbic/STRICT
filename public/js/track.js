@@ -16,6 +16,7 @@ class Zone {
         this.decorations = zoneData.decorations || null;
         this.ruleset = zoneData.ruleset || 'standard';
         this.visibilityRadius = zoneData.visibilityRadius || null;
+        this.isHub = zoneData.isHub || false;
         
         // Performance optimization: cache time-based values
         this.lastClockUpdate = 0;
