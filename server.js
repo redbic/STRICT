@@ -84,9 +84,6 @@ const sessionMiddleware = session({
   }
 });
 
-console.log('[Server] NODE_ENV:', process.env.NODE_ENV || 'development');
-console.log('[Server] Cookie secure:', isProduction);
-
 // Body parser for login (must come before auth routes)
 app.use(express.json({ limit: HTTP_BODY_SIZE_LIMIT }));
 
@@ -466,26 +463,14 @@ function handleLeaveRoom(ws) {
 }
 
 function handlePlayerUpdate(ws, data) {
-  if (!ws.roomId) {
-    console.log('[PlayerUpdate] No roomId');
-    return;
-  }
+  if (!ws.roomId) return;
   const room = rooms.getRoom(ws.roomId);
-  if (!room) {
-    console.log('[PlayerUpdate] Room not found:', ws.roomId);
-    return;
-  }
+  if (!room) return;
 
-  if (!isValidPlayerState(data.state)) {
-    console.log('[PlayerUpdate] Invalid state:', JSON.stringify(data.state));
-    return;
-  }
+  if (!isValidPlayerState(data.state)) return;
 
   const sender = room.players.find(p => p.id === ws.playerId);
-  if (!sender) {
-    console.log('[PlayerUpdate] Sender not found:', ws.playerId);
-    return;
-  }
+  if (!sender) return;
 
   // Pre-serialize once for all recipients
   const payload = JSON.stringify({
@@ -494,18 +479,11 @@ function handlePlayerUpdate(ws, data) {
     state: data.state,
   });
 
-  let sentCount = 0;
   room.players.forEach(player => {
     if (player.ws !== ws && player.ws.readyState === WebSocket.OPEN && player.zone === sender.zone) {
       player.ws.send(payload);
-      sentCount++;
     }
   });
-
-  // Log occasionally to avoid spam
-  if (Math.random() < 0.05) {
-    console.log(`[PlayerUpdate] ${ws.playerId} -> ${sentCount} players in zone ${sender.zone}`);
-  }
 }
 
 function handleGameStart(ws) {

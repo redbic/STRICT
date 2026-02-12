@@ -38,48 +38,23 @@ function isFiniteNumberInRange(value, min, max) {
 }
 
 function isValidPlayerState(state) {
-  if (!state || typeof state !== 'object' || Array.isArray(state)) {
-    console.log('[Validation] State is not an object');
-    return false;
-  }
+  if (!state || typeof state !== 'object' || Array.isArray(state)) return false;
 
   const stateKeys = Object.keys(state);
-  const unknownKeys = stateKeys.filter(key => !PLAYER_STATE_KEYS.has(key));
-  if (unknownKeys.length > 0) {
-    console.log('[Validation] Unknown keys:', unknownKeys);
-    return false;
-  }
+  if (stateKeys.some(key => !PLAYER_STATE_KEYS.has(key))) return false;
 
-  const checks = {
-    x: isFiniteNumberInRange(state.x, -10000, 10000),
-    y: isFiniteNumberInRange(state.y, -10000, 10000),
-    angle: isFiniteNumberInRange(state.angle, -Math.PI * 4, Math.PI * 4),
-    speed: isFiniteNumberInRange(state.speed, 0, 10),
-    zoneLevel: Number.isInteger(state.zoneLevel) && state.zoneLevel >= 1 && state.zoneLevel <= 10000,
-    stunned: typeof state.stunned === 'boolean',
-  };
+  const validCoreFields =
+    isFiniteNumberInRange(state.x, -10000, 10000) &&
+    isFiniteNumberInRange(state.y, -10000, 10000) &&
+    isFiniteNumberInRange(state.angle, -Math.PI * 4, Math.PI * 4) &&
+    isFiniteNumberInRange(state.speed, 0, 10) &&
+    Number.isInteger(state.zoneLevel) && state.zoneLevel >= 1 && state.zoneLevel <= 10000;
 
-  const failedChecks = Object.entries(checks).filter(([_, valid]) => !valid).map(([key]) => key);
-  if (failedChecks.length > 0) {
-    console.log('[Validation] Failed checks:', failedChecks, 'Values:', {
-      x: state.x,
-      y: state.y,
-      angle: state.angle,
-      speed: state.speed,
-      zoneLevel: state.zoneLevel,
-      stunned: state.stunned,
-    });
-    return false;
-  }
+  if (!validCoreFields) return false;
+  if (typeof state.stunned !== 'boolean') return false;
 
-  if (state.id !== undefined && !isValidPlayerId(state.id)) {
-    console.log('[Validation] Invalid player id:', state.id);
-    return false;
-  }
-  if (state.username !== undefined && !isValidUsername(state.username)) {
-    console.log('[Validation] Invalid username:', state.username);
-    return false;
-  }
+  if (state.id !== undefined && !isValidPlayerId(state.id)) return false;
+  if (state.username !== undefined && !isValidUsername(state.username)) return false;
 
   return true;
 }
