@@ -142,7 +142,11 @@ class NetworkManager {
     }
 
     enterZone(zoneId) {
-        if (!this.connected) return;
+        console.log('NetworkManager.enterZone:', zoneId, 'connected:', this.connected);
+        if (!this.connected) {
+            console.error('Cannot enter zone - not connected');
+            return;
+        }
         this.send({
             type: 'zone_enter',
             zoneId: zoneId

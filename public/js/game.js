@@ -516,7 +516,7 @@ class Game {
             return;
         }
         if (this.lastPortalId === portal.id) return;
-        
+
         // Check if portal is locked
         if (portal.locked) {
             this.lastPortalId = portal.id;
@@ -524,6 +524,7 @@ class Game {
             return;
         }
 
+        console.log('Portal triggered:', portal.id, 'onPortalEnter:', !!this.onPortalEnter);
         if (this.onPortalEnter) {
             this.onPortalEnter(portal.id);
         } else {

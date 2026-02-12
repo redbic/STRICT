@@ -111,6 +111,7 @@ function setupEventListeners() {
     });
     
     document.getElementById('recallBtn').addEventListener('click', () => {
+        console.log('Recall button clicked');
         recallToHub();
     });
 
@@ -178,10 +179,14 @@ function setupNetworkHandlers() {
     };
 
     networkManager.onZoneEnter = (data) => {
+        console.log('Zone enter received:', data);
         // This is for the LOCAL player entering a zone
         if (game && data.zoneId && data.playerId === networkManager.playerId) {
             const zonePlayers = data.zonePlayers || [];
+            console.log('Transitioning to zone:', data.zoneId);
             game.transitionZone(data.zoneId, zonePlayers, networkManager.playerId);
+        } else {
+            console.log('Zone enter ignored:', { game: !!game, zoneId: data.zoneId, playerId: data.playerId, myPlayerId: networkManager.playerId });
         }
     };
 
@@ -526,10 +531,11 @@ function startGame(zoneName) {
     const playerId = networkManager ? networkManager.playerId : 'player1';
     game.init(zoneName, currentUsername, playerId);
     game.onPortalEnter = (targetZoneId) => {
-        if (networkManager) {
+        console.log('Portal enter:', targetZoneId);
+        if (networkManager && networkManager.connected) {
             networkManager.enterZone(targetZoneId);
         } else {
-            console.error('No network connection for portal transition');
+            console.error('No network connection for portal transition', { networkManager: !!networkManager, connected: networkManager?.connected });
         }
     };
     
@@ -620,8 +626,12 @@ function hasSignificantChange(oldState, newState) {
 }
 
 function recallToHub() {
+    console.log('recallToHub called', { game: !!game, zone: game?.zone?.name, isHub: game?.zone?.isHub });
     if (!game) return;
-    if (game.zone && game.zone.isHub) return;
+    if (game.zone && game.zone.isHub) {
+        console.log('Already in hub, skipping recall');
+        return;
+    }
 
     // If player is dead, handle respawn first
     if (game.localPlayer && game.localPlayer.isDead) {
@@ -629,9 +639,10 @@ function recallToHub() {
         game.localPlayer.respawn();
     }
 
-    if (networkManager) {
+    if (networkManager && networkManager.connected) {
+        console.log('Sending enterZone(hub)');
         networkManager.enterZone('hub');
     } else {
-        console.error('No network connection for recall');
+        console.error('No network connection for recall', { networkManager: !!networkManager, connected: networkManager?.connected });
     }
 }
