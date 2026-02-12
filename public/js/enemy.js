@@ -10,6 +10,19 @@ const ENEMY_ATTACK_COOLDOWN_FRAMES = 45;
 const ENEMY_SIZE = 22;
 
 class Enemy {
+    /**
+     * Create a new enemy
+     * @param {number} x - Initial x position
+     * @param {number} y - Initial y position
+     * @param {string} id - Unique enemy identifier
+     * @param {Object} options - Enemy configuration options
+     * @param {number} [options.speed] - Movement speed (default: ENEMY_DEFAULT_SPEED)
+     * @param {number} [options.hp] - Current hit points (default: ENEMY_DEFAULT_HP)
+     * @param {number} [options.maxHp] - Maximum hit points (default: ENEMY_DEFAULT_HP)
+     * @param {number} [options.damage] - Attack damage (default: ENEMY_DEFAULT_DAMAGE)
+     * @param {boolean} [options.stationary] - Whether enemy cannot move (default: false)
+     * @param {boolean} [options.passive] - Whether enemy cannot attack (default: false)
+     */
     constructor(x, y, id, options = {}) {
         this.x = x;
         this.y = y;
@@ -32,7 +45,11 @@ class Enemy {
         this.stationary = options.stationary || false;
         this.passive = options.passive || false;
     }
-
+    /**
+     * Update enemy AI - chase and attack target
+     * @param {Zone} zone - Current zone for collision detection
+     * @param {Player} target - Player to chase and attack
+     */
     update(zone, target) {
         if (!target) return;
         
@@ -76,11 +93,19 @@ class Enemy {
             this.attackCooldown--;
         }
     }
-
+    /**
+     * Apply damage to enemy
+     * @param {number} amount - Damage amount
+     */
     takeDamage(amount) {
         this.hp = Math.max(0, this.hp - amount);
     }
-
+    /**
+     * Draw enemy on canvas
+     * @param {CanvasRenderingContext2D} ctx - Canvas context
+     * @param {number} cameraX - Camera x offset
+     * @param {number} cameraY - Camera y offset
+     */
     draw(ctx, cameraX, cameraY) {
         const screenX = this.x - cameraX;
         const screenY = this.y - cameraY;

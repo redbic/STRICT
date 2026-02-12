@@ -71,20 +71,29 @@ class Game {
                 return;
             }
             if (e.button !== 0 || !this.localPlayer) return;
+            
+            // Only show attack visual if not on cooldown
+            if (this.localPlayer.attackCooldown > 0) return;
 
             const worldX = this.lastMouse.x + this.cameraX;
             const worldY = this.lastMouse.y + this.cameraY;
             const angle = Math.atan2(worldY - this.localPlayer.y, worldX - this.localPlayer.x);
-            this.attackFx.active = true;
-            this.attackFx.timer = 8;
-            this.attackFx.angle = angle;
             
+            let didAttack = false;
             if (this.isHost) {
                 // Host applies damage directly
-                this.localPlayer.tryAttack(this.enemies);
+                didAttack = this.localPlayer.tryAttack(this.enemies);
             } else {
                 // Non-host sends damage to host via network
                 this.attackEnemiesRemote();
+                didAttack = true; // Assume success for visual feedback
+            }
+            
+            // Show attack effect only if attack was attempted
+            if (didAttack) {
+                this.attackFx.active = true;
+                this.attackFx.timer = 8;
+                this.attackFx.angle = angle;
             }
         };
 
@@ -182,7 +191,7 @@ class Game {
         if (this.isHost) {
             newlyDead.forEach(enemy => {
                 if (this.onEnemyKilled) {
-                    this.onEnemyKilled(enemy.id, this.zone ? this.zone.name : 'unknown');
+                    this.onEnemyKilled(enemy.id, this.zoneId || 'unknown');
                 }
             });
         }
