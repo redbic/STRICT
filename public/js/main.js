@@ -6,6 +6,7 @@ let currentRoomPlayers = [];
 let currentProfile = null;
 let playerUpdateInterval = null; // Track interval to prevent leaks
 let enemySyncInterval = null; // Track enemy sync interval
+let currentHostId = null; // Track the current host ID across game creation
 
 // Helper function to update balance display
 function updateBalanceDisplay(balance) {
@@ -75,8 +76,10 @@ function setupEventListeners() {
             try {
                 await networkManager.connect();
                 
-                // Generate room ID
-                const roomId = 'room-' + Math.random().toString(36).substring(2, 11);
+                // Use entered room code or generate a new one
+                const joinInput = document.getElementById('joinRoomInput');
+                const enteredRoom = joinInput ? joinInput.value.trim() : '';
+                const roomId = enteredRoom || ('room-' + Math.random().toString(36).substring(2, 11));
                 const playerId = 'player-' + Math.random().toString(36).substring(2, 11);
                 
                 networkManager.joinRoom(roomId, playerId, username);
@@ -107,7 +110,10 @@ function setupEventListeners() {
     document.getElementById('leaveLobbyBtn').addEventListener('click', () => {
         if (networkManager) {
             networkManager.leaveRoom();
+            networkManager.disconnect();
+            networkManager = null;
         }
+        currentHostId = null;
         showScreen('menu');
     });
     
@@ -209,6 +215,7 @@ function setupNetworkHandlers() {
 }
 
 function updateHostStatus(hostId) {
+    currentHostId = hostId;
     if (!game || !networkManager) return;
     const wasHost = game.isHost;
     game.isHost = (networkManager.playerId === hostId);
@@ -355,6 +362,11 @@ function startGame(zoneName) {
     
     // Send updates to server
     if (networkManager) {
+        // Apply stored host status (room_update may have arrived before game was created)
+        if (currentHostId) {
+            game.isHost = (networkManager.playerId === currentHostId);
+        }
+        
         game.syncMultiplayerPlayers(currentRoomPlayers, networkManager.playerId);
         
         // Clear previous interval to prevent leaks

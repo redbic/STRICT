@@ -229,6 +229,9 @@ const ZONES = {
         portals: [
             { id: 'hub', x: 770, y: 1080, width: 60, height: 60, label: 'Return to Lobby' }
         ],
+        enemies: [
+            { x: 800, y: 400, stationary: false, passive: false, hp: 50, maxHp: 50 }
+        ]
     },
     training: {
         name: 'Training',
