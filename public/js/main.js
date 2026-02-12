@@ -147,12 +147,13 @@ function setupNetworkHandlers() {
     networkManager.onEnemyRespawn = (data) => {
         if (game && data.enemyId && data.zone) {
             // Re-add the enemy to the game
+            // Zone names from server use Title Case, but ZONES keys use lowercase
             const zoneData = ZONES[data.zone.toLowerCase()];
             if (zoneData && zoneData.enemies) {
-                // Find the enemy config
+                // Find the enemy config - enemyId format: "zonename-enemy-index"
                 const enemyIndex = parseInt(data.enemyId.split('-').pop());
-                const enemyConfig = zoneData.enemies[enemyIndex];
-                if (enemyConfig) {
+                if (!isNaN(enemyIndex) && enemyIndex >= 0 && enemyIndex < zoneData.enemies.length) {
+                    const enemyConfig = zoneData.enemies[enemyIndex];
                     const enemy = new Enemy(enemyConfig.x, enemyConfig.y, data.enemyId, {
                         stationary: enemyConfig.stationary,
                         passive: enemyConfig.passive,

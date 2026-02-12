@@ -26,7 +26,7 @@ class Enemy {
     update(zone, target) {
         if (!target) return;
         
-        // Stationary enemies don't move or attack
+        // Stationary enemies don't move
         if (this.stationary) return;
 
         if (this.stunned) {
