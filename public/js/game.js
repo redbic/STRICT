@@ -275,18 +275,18 @@ class Game {
             });
         }
 
-        // Check enemy defeats
-        const newlyDead = this.enemies.filter(enemy => enemy.hp <= 0);
-        this.enemies = this.enemies.filter(enemy => enemy.hp > 0);
-
-        // Notify about kills (only host or zone host reports kills to prevent double rewards)
+        // Check enemy defeats (only authoritative player removes enemies and reports kills)
         if (this.isHost || this.isZoneHost) {
+            const newlyDead = this.enemies.filter(enemy => enemy.hp <= 0);
+            this.enemies = this.enemies.filter(enemy => enemy.hp > 0);
+
             newlyDead.forEach(enemy => {
                 if (this.onEnemyKilled) {
                     this.onEnemyKilled(enemy.id, this.zoneId || 'unknown');
                 }
             });
         }
+        // Non-authoritative players: enemy removal is handled by applyEnemySync()
 
         // Check if local player took damage (from enemies or other sources)
         if (this.localPlayer && !this.localPlayer.isDead) {
@@ -406,6 +406,10 @@ class Game {
 
     applyEnemySync(enemyStates) {
         if (!Array.isArray(enemyStates)) return;
+
+        // Track which enemies are in the sync
+        const syncedIds = new Set(enemyStates.map(s => s.id));
+
         enemyStates.forEach(state => {
             const enemy = this.enemies.find(e => e.id === state.id);
             if (enemy) {
@@ -418,8 +422,9 @@ class Game {
                 enemy.attackCooldown = state.attackCooldown;
             }
         });
-        // Remove enemies that are dead according to host
-        this.enemies = this.enemies.filter(e => e.hp > 0);
+
+        // Remove enemies that are dead OR not in sync (killed by authoritative player)
+        this.enemies = this.enemies.filter(e => e.hp > 0 && syncedIds.has(e.id));
     }
 
     updateProjectiles(dt) {
