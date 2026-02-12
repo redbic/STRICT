@@ -146,6 +146,14 @@ class Player {
         // Update position
         this.x += this.velocityX;
         this.y += this.velocityY;
+
+        // Clamp to zone bounds
+        if (zone) {
+            const halfW = this.width / 2;
+            const halfH = this.height / 2;
+            this.x = Math.max(halfW, Math.min(zone.width - halfW, this.x));
+            this.y = Math.max(halfH, Math.min(zone.height - halfH, this.y));
+        }
         
         // Check area collision
         if (zone && zone.checkCollision(this)) {

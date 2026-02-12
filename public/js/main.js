@@ -431,21 +431,25 @@ function scheduleInventorySave(inventory) {
 
 async function hydrateRoomAvatars(players) {
     if (!game || !players) return;
-    const targets = players.filter(p => p && p.username);
-    for (const p of targets) {
+    const targets = players.filter(p => {
+        if (!p || !p.username) return false;
         const playerObj = game.players.find(player => player.username === p.username);
-        if (!playerObj) continue;
-        if (playerObj.avatarUrl) continue;
-        try {
-            const res = await fetch(`/api/profile?name=${encodeURIComponent(p.username)}`);
-            const data = await res.json();
-            if (data && data.character && data.character.dataURL) {
-                playerObj.setAvatar(data.character.dataURL);
-            }
-        } catch (err) {
-            console.error('Failed to hydrate avatar:', err);
-        }
-    }
+        return playerObj && !playerObj.avatarUrl;
+    });
+    if (targets.length === 0) return;
+
+    // Fetch all needed avatars in parallel
+    const fetches = targets.map(p =>
+        fetch(`/api/profile?name=${encodeURIComponent(p.username)}`)
+            .then(res => res.json())
+            .catch(() => null)
+    );
+    const results = await Promise.all(fetches);
+    results.forEach((data, i) => {
+        if (!data || !data.character || !data.character.dataURL) return;
+        const playerObj = game.players.find(player => player.username === targets[i].username);
+        if (playerObj) playerObj.setAvatar(data.character.dataURL);
+    });
 }
 
 function updateAvatar(imgId, placeholderId, avatarUrl) {

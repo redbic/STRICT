@@ -471,9 +471,18 @@ class Game {
             }
         });
 
-        // Draw NPCs
+        // Draw NPCs with visibility culling
         this.npcs.forEach(npc => {
-            npc.draw(this.ctx, this.cameraX, this.cameraY);
+            const npcRect = {
+                x: npc.x - npc.width/2,
+                y: npc.y - npc.height/2,
+                width: npc.width,
+                height: npc.height
+            };
+            if (!this.zone || this.zone.isVisible(npcRect, this.cameraX, this.cameraY,
+                                                    this.canvas.width, this.canvas.height)) {
+                npc.draw(this.ctx, this.cameraX, this.cameraY);
+            }
         });
 
         this.drawAttackFx();
