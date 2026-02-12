@@ -44,7 +44,6 @@ class Player {
         // Game stats
         this.zoneLevel = 1;
         this.nodesVisited = [];
-        this.position = 1;
 
         // Combat
         this.maxHp = PLAYER_DEFAULT_HP;
@@ -371,7 +370,6 @@ class Player {
             angle: this.angle,
             speed: this.speed,
             zoneLevel: this.zoneLevel,
-            position: this.position,
             username: this.username,
             stunned: this.stunned
         };
@@ -384,7 +382,6 @@ class Player {
         this.angle = state.angle;
         this.speed = state.speed;
         this.zoneLevel = state.zoneLevel;
-        this.position = state.position;
         this.stunned = state.stunned;
     }
 

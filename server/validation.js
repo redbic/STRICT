@@ -7,7 +7,7 @@ const ROOM_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
 const PLAYER_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
 const USERNAME_PATTERN = /^[A-Za-z0-9]([A-Za-z0-9 _-]*[A-Za-z0-9])?$/;
 const ALLOWED_ZONE_IDS = new Set(['hub', 'training', 'gallery']);
-const PLAYER_STATE_KEYS = new Set(['id', 'x', 'y', 'angle', 'speed', 'zoneLevel', 'position', 'username', 'stunned']);
+const PLAYER_STATE_KEYS = new Set(['id', 'x', 'y', 'angle', 'speed', 'zoneLevel', 'username', 'stunned']);
 const INVENTORY_MAX_ITEMS = 16;
 
 function normalizeSafeString(value) {
@@ -47,12 +47,11 @@ function isValidPlayerState(state) {
     isFiniteNumberInRange(state.x, -10000, 10000) &&
     isFiniteNumberInRange(state.y, -10000, 10000) &&
     isFiniteNumberInRange(state.angle, -Math.PI * 4, Math.PI * 4) &&
-    isFiniteNumberInRange(state.speed, 0, 100) &&
+    isFiniteNumberInRange(state.speed, 0, 10) && // Client max speed is ~3.1, allow margin for future features
     Number.isInteger(state.zoneLevel) && state.zoneLevel >= 1 && state.zoneLevel <= 100;
 
   if (!validCoreFields) return false;
   if (typeof state.stunned !== 'boolean') return false;
-  if (!Number.isInteger(state.position) || state.position < 0 || state.position > 16) return false;
 
   if (state.id !== undefined && !isValidPlayerId(state.id)) return false;
   if (state.username !== undefined && !isValidUsername(state.username)) return false;

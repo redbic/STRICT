@@ -19,6 +19,7 @@ class Game {
         this.running = false;
         this.gameStarted = false;
         this.lastFrameTime = 0;
+        this.deltaTime = 1/60; // Initialize to 60fps equivalent to prevent undefined on first frame
         
         this.cameraX = 0;
         this.cameraY = 0;

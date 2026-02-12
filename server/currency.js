@@ -4,6 +4,20 @@
 // In-memory fallback for local development without DATABASE_URL
 const inMemoryBalances = new Map();
 
+// Simple lock mechanism to prevent race conditions in in-memory operations
+const inMemoryLocks = new Map();
+
+async function acquireLock(playerName) {
+  while (inMemoryLocks.get(playerName)) {
+    await new Promise(resolve => setTimeout(resolve, 1));
+  }
+  inMemoryLocks.set(playerName, true);
+}
+
+function releaseLock(playerName) {
+  inMemoryLocks.delete(playerName);
+}
+
 /**
  * Validate and round amount to 2 decimal places
  * @param {number} amount - The amount to validate
@@ -32,13 +46,18 @@ async function addBalance(pool, playerName, amount, reason, metadata) {
     return null;
   }
 
-  // In-memory fallback
+  // In-memory fallback with lock to prevent race conditions
   if (!pool) {
-    const currentBalance = inMemoryBalances.get(playerName) || 1000;
-    const newBalance = Math.round((currentBalance + validAmount) * 100) / 100;
-    inMemoryBalances.set(playerName, newBalance);
-    console.log(`[In-Memory] Added ${validAmount} to ${playerName}. New balance: ${newBalance}`);
-    return newBalance;
+    await acquireLock(playerName);
+    try {
+      const currentBalance = inMemoryBalances.get(playerName) || 1000;
+      const newBalance = Math.round((currentBalance + validAmount) * 100) / 100;
+      inMemoryBalances.set(playerName, newBalance);
+      console.log(`[In-Memory] Added ${validAmount} to ${playerName}. New balance: ${newBalance}`);
+      return newBalance;
+    } finally {
+      releaseLock(playerName);
+    }
   }
 
   // Database transaction
@@ -106,17 +125,22 @@ async function deductBalance(pool, playerName, amount, reason, metadata) {
     return null;
   }
 
-  // In-memory fallback
+  // In-memory fallback with lock to prevent race conditions
   if (!pool) {
-    const currentBalance = inMemoryBalances.get(playerName) || 1000;
-    if (currentBalance < validAmount) {
-      console.log(`[In-Memory] Insufficient funds for ${playerName}`);
-      return null;
+    await acquireLock(playerName);
+    try {
+      const currentBalance = inMemoryBalances.get(playerName) || 1000;
+      if (currentBalance < validAmount) {
+        console.log(`[In-Memory] Insufficient funds for ${playerName}`);
+        return null;
+      }
+      const newBalance = Math.round((currentBalance - validAmount) * 100) / 100;
+      inMemoryBalances.set(playerName, newBalance);
+      console.log(`[In-Memory] Deducted ${validAmount} from ${playerName}. New balance: ${newBalance}`);
+      return newBalance;
+    } finally {
+      releaseLock(playerName);
     }
-    const newBalance = Math.round((currentBalance - validAmount) * 100) / 100;
-    inMemoryBalances.set(playerName, newBalance);
-    console.log(`[In-Memory] Deducted ${validAmount} from ${playerName}. New balance: ${newBalance}`);
-    return newBalance;
   }
 
   // Database transaction

@@ -1,4 +1,7 @@
 // Main application logic
+const USERNAME_PATTERN = /^[A-Za-z0-9]([A-Za-z0-9 _-]*[A-Za-z0-9])?$/;
+const MAX_USERNAME_LENGTH = 32;
+
 let game = null;
 let networkManager = null;
 let currentUsername = '';
@@ -45,6 +48,14 @@ function setupEventListeners() {
         const username = document.getElementById('username').value.trim();
         if (!username) {
             alert('Please enter your name');
+            return;
+        }
+        if (username.length > MAX_USERNAME_LENGTH) {
+            alert(`Username must be ${MAX_USERNAME_LENGTH} characters or less`);
+            return;
+        }
+        if (!USERNAME_PATTERN.test(username)) {
+            alert('Username must start and end with alphanumeric characters and can only contain letters, numbers, spaces, underscores, and hyphens');
             return;
         }
         currentUsername = username;
@@ -122,9 +133,14 @@ function setupEventListeners() {
             playerUpdateInterval = null;
         }
         stopEnemySyncInterval();
+        // Clean up game instance to prevent memory leaks from event listeners
+        if (game) {
+            game.destroy();
+            game = null;
+        }
         currentHostId = null;
         showScreen('menu');
-        
+
         // Resume room browsing
         startRoomBrowsing();
     });
@@ -375,6 +391,10 @@ async function joinExistingRoom(roomId) {
 async function loadProfile(username) {
     try {
         const res = await fetch(`/api/profile?name=${encodeURIComponent(username)}`);
+        if (!res.ok) {
+            console.error('Profile load failed:', res.status);
+            return;
+        }
         const data = await res.json();
         currentProfile = data;
 
@@ -534,8 +554,9 @@ function startGame(zoneName) {
         // Clear previous interval to prevent leaks
         if (playerUpdateInterval) {
             clearInterval(playerUpdateInterval);
+            playerUpdateInterval = null;
         }
-        
+
         // Track last sent state to avoid redundant updates
         let lastSentState = null;
         
@@ -560,10 +581,11 @@ function hasSignificantChange(oldState, newState) {
     const dx = Math.abs(newState.x - oldState.x);
     const dy = Math.abs(newState.y - oldState.y);
     const dAngle = Math.abs(newState.angle - oldState.angle);
-    return dx > positionThreshold || 
-           dy > positionThreshold || 
+    return dx > positionThreshold ||
+           dy > positionThreshold ||
            dAngle > angleThreshold ||
-           oldState.stunned !== newState.stunned;
+           oldState.stunned !== newState.stunned ||
+           oldState.zoneLevel !== newState.zoneLevel;
 }
 
 function recallToHub() {

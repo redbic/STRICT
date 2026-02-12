@@ -88,7 +88,6 @@ class RoomManager {
     return room.players.map(p => ({
       id: p.id,
       username: p.username,
-      ready: p.ready,
       zone: p.zone,
     }));
   }

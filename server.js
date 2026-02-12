@@ -34,6 +34,7 @@ const wss = new WebSocket.Server({
 
 const PORT = process.env.PORT || 3000;
 const ENEMY_KILL_REWARD = 5;
+// Inbound WebSocket message types (client -> server)
 const WS_MESSAGE_TYPES = new Set([
   'join_room',
   'leave_room',
@@ -45,6 +46,9 @@ const WS_MESSAGE_TYPES = new Set([
   'enemy_damage',
   'list_rooms',
 ]);
+// Outbound message types (server -> client):
+// room_update, player_state, game_start, zone_enter, player_zone,
+// balance_update, enemy_sync, enemy_respawn, host_assigned, player_left, room_list, room_full
 const HTTP_BODY_SIZE_LIMIT = '16kb';
 const WS_MAX_ENEMY_SYNC_COUNT = 64;
 const WS_MAX_CONNECTIONS_PER_IP = 5;
@@ -54,6 +58,7 @@ const APP_AUTH_USERNAME = 'strict1000';
 const WS_RATE_LIMIT_WINDOW_MS = 10000;
 const WS_RATE_LIMIT_MAX_MESSAGES = 100;
 const wsConnectionsByIp = new Map();
+const WS_IP_CLEANUP_INTERVAL_MS = 60000; // Clean up stale IP entries every 60s
 
 validateEnvironment();
 
@@ -213,6 +218,21 @@ async function ensurePlayerSchema() {
 }
 
 // --- WebSocket handlers ---
+
+/**
+ * Safely send data to a WebSocket client with error handling
+ * @param {WebSocket} ws - WebSocket connection
+ * @param {object} data - Data to send (will be JSON stringified)
+ */
+function safeSend(ws, data) {
+  if (ws.readyState === WebSocket.OPEN) {
+    try {
+      ws.send(JSON.stringify(data));
+    } catch (_) {
+      /* ignore send errors - connection may be closing */
+    }
+  }
+}
 
 function broadcastRoomList() {
   const available = rooms.getAvailableRooms();
@@ -401,7 +421,7 @@ function handleJoinRoom(ws, data) {
   if (room.players.some(p => p.id === nPlayerId)) return;
 
   if (room.players.length >= MAX_PARTY_SIZE) {
-    ws.send(JSON.stringify({ type: 'room_full', maxPlayers: MAX_PARTY_SIZE }));
+    safeSend(ws, { type: 'room_full', maxPlayers: MAX_PARTY_SIZE });
     return;
   }
 
@@ -409,7 +429,6 @@ function handleJoinRoom(ws, data) {
     id: nPlayerId,
     username: nUsername,
     ws,
-    ready: false,
     zone: 'hub',
   };
 
@@ -426,7 +445,7 @@ function handleJoinRoom(ws, data) {
   });
 
   if (room.started) {
-    ws.send(JSON.stringify({ type: 'game_start', timestamp: Date.now() }));
+    safeSend(ws, { type: 'game_start', timestamp: Date.now() });
   }
 
   broadcastRoomList();
@@ -509,12 +528,12 @@ function handleZoneEnter(ws, data) {
     .filter(p => p.zone === zoneId && p.id !== ws.playerId)
     .map(p => ({ id: p.id, username: p.username, zone: p.zone }));
 
-  ws.send(JSON.stringify({
+  safeSend(ws, {
     type: 'zone_enter',
     zoneId,
     playerId: ws.playerId,
     zonePlayers: zoneMates,
-  }));
+  });
 }
 
 async function handleEnemyKilled(ws, data) {
@@ -537,32 +556,30 @@ async function handleEnemyKilled(ws, data) {
   );
 
   if (newBalance !== null) {
-    ws.send(JSON.stringify({ type: 'balance_update', balance: newBalance }));
+    safeSend(ws, { type: 'balance_update', balance: newBalance });
   }
 
-  // Respawn timer for training zone
-  if (zoneKey === 'training') {
-    const respawnDelay = 10000;
-    if (room.respawnTimers.has(enemyKey)) {
-      clearTimeout(room.respawnTimers.get(enemyKey));
-    }
-
-    const roomId = ws.roomId;
-    const timerId = setTimeout(() => {
-      const currentRoom = rooms.getRoom(roomId);
-      if (!currentRoom) return;
-
-      currentRoom.killedEnemies.delete(enemyKey);
-      rooms.broadcastToRoom(roomId, {
-        type: 'enemy_respawn',
-        enemyId,
-        zone: zoneKey,
-      });
-      currentRoom.respawnTimers.delete(enemyKey);
-    }, respawnDelay);
-
-    room.respawnTimers.set(enemyKey, timerId);
+  // Respawn timer for all zones
+  const respawnDelay = 10000;
+  if (room.respawnTimers.has(enemyKey)) {
+    clearTimeout(room.respawnTimers.get(enemyKey));
   }
+
+  const roomId = ws.roomId;
+  const timerId = setTimeout(() => {
+    const currentRoom = rooms.getRoom(roomId);
+    if (!currentRoom) return;
+
+    currentRoom.killedEnemies.delete(enemyKey);
+    rooms.broadcastToRoom(roomId, {
+      type: 'enemy_respawn',
+      enemyId,
+      zone: zoneKey,
+    });
+    currentRoom.respawnTimers.delete(enemyKey);
+  }, respawnDelay);
+
+  room.respawnTimers.set(enemyKey, timerId);
 }
 
 function handleEnemySync(ws, data) {
@@ -596,14 +613,12 @@ function handleEnemyDamage(ws, data) {
   const host = room.players.find(p => p.id === room.hostId);
   if (!sender || !host || sender.zone !== host.zone) return;
 
-  if (host.ws.readyState === WebSocket.OPEN) {
-    host.ws.send(JSON.stringify({
-      type: 'enemy_damage',
-      enemyId: data.enemyId,
-      damage: data.damage,
-      attackerId: ws.playerId,
-    }));
-  }
+  safeSend(host.ws, {
+    type: 'enemy_damage',
+    enemyId: data.enemyId,
+    damage: data.damage,
+    attackerId: ws.playerId,
+  });
 }
 
 function handleDisconnect(ws) {
@@ -626,7 +641,7 @@ function handleDisconnect(ws) {
 }
 
 function handleListRooms(ws) {
-  ws.send(JSON.stringify({ type: 'room_list', rooms: rooms.getAvailableRooms() }));
+  safeSend(ws, { type: 'room_list', rooms: rooms.getAvailableRooms() });
 }
 
 function shutdown(signal) {
@@ -644,6 +659,15 @@ function shutdown(signal) {
 
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
+
+// Periodic cleanup of stale IP connection counts
+setInterval(() => {
+  for (const [ip, count] of wsConnectionsByIp) {
+    if (count <= 0) {
+      wsConnectionsByIp.delete(ip);
+    }
+  }
+}, WS_IP_CLEANUP_INTERVAL_MS);
 
 // Start server
 server.listen(PORT, async () => {
