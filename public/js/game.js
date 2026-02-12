@@ -117,7 +117,8 @@ class Game {
         window.addEventListener('mousemove', this.handleMouseMove);
         window.addEventListener('mousedown', this.handleMouseDown);
         window.addEventListener('resize', this.handleResize);
-        this.canvas.addEventListener('contextmenu', this.handleContextMenu);
+        // Prevent context menu on entire game screen to avoid accidental triggers during intense gameplay
+        document.addEventListener('contextmenu', this.handleContextMenu);
     }
 
     resizeCanvas() {
@@ -612,6 +613,6 @@ class Game {
         window.removeEventListener('mousemove', this.handleMouseMove);
         window.removeEventListener('mousedown', this.handleMouseDown);
         window.removeEventListener('resize', this.handleResize);
-        this.canvas.removeEventListener('contextmenu', this.handleContextMenu);
+        document.removeEventListener('contextmenu', this.handleContextMenu);
     }
 }
