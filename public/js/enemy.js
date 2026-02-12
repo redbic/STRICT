@@ -1,13 +1,14 @@
 // Enemy class for adventure combat
 
-// Constants
-const ENEMY_DEFAULT_SPEED = 1.8;  // Slower than player max speed for tactical gameplay
+// Constants (time-based, units per second)
+const ENEMY_DEFAULT_SPEED = 108;  // pixels per second (was 1.8 * 60)
 const ENEMY_DEFAULT_HP = 50;
 const ENEMY_DEFAULT_DAMAGE = 8;
 const ENEMY_ATTACK_RANGE = 28;
 const ENEMY_AGGRO_RANGE = 320;
-const ENEMY_ATTACK_COOLDOWN_FRAMES = 45;
+const ENEMY_ATTACK_COOLDOWN = 0.75;  // seconds (was 45 frames / 60)
 const ENEMY_SIZE = 22;
+const ENEMY_STUN_DURATION = 0.3;     // seconds
 
 class Enemy {
     /**
@@ -49,15 +50,16 @@ class Enemy {
      * Update enemy AI - chase and attack target
      * @param {Zone} zone - Current zone for collision detection
      * @param {Player} target - Player to chase and attack
+     * @param {number} dt - Delta time in seconds
      */
-    update(zone, target) {
+    update(zone, target, dt = 1/60) {
         if (!target) return;
-        
+
         // Stationary enemies don't move
         if (this.stationary) return;
 
         if (this.stunned) {
-            this.stunnedTime--;
+            this.stunnedTime -= dt;
             if (this.stunnedTime <= 0) {
                 this.stunned = false;
             }
@@ -72,8 +74,8 @@ class Enemy {
             if (dist > this.attackRange) {
                 const nx = dx / dist;
                 const ny = dy / dist;
-                const nextX = this.x + nx * this.speed;
-                const nextY = this.y + ny * this.speed;
+                const nextX = this.x + nx * this.speed * dt;
+                const nextY = this.y + ny * this.speed * dt;
 
                 const oldX = this.x;
                 const oldY = this.y;
@@ -85,12 +87,12 @@ class Enemy {
                 }
             } else if (this.attackCooldown <= 0 && !this.passive) {
                 target.takeDamage(this.damage);
-                this.attackCooldown = ENEMY_ATTACK_COOLDOWN_FRAMES;
+                this.attackCooldown = ENEMY_ATTACK_COOLDOWN;
             }
         }
 
         if (this.attackCooldown > 0) {
-            this.attackCooldown--;
+            this.attackCooldown -= dt;
         }
     }
     /**

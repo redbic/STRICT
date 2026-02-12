@@ -185,25 +185,27 @@ class Game {
     update() {
         if (!this.gameStarted) return;
 
+        const dt = this.deltaTime || 1/60;
+
         // Update local player
         if (this.localPlayer) {
-            this.localPlayer.update(this.keys, this.zone);
+            this.localPlayer.update(this.keys, this.zone, dt);
             this.handlePickupCollision();
         }
 
         // Interpolate remote players toward their latest server state
         this.players.forEach(player => {
             if (player !== this.localPlayer) {
-                player.interpolateRemote(this.deltaTime || 1/60);
+                player.interpolateRemote(dt);
             }
         });
-        
+
         // Only the host runs enemy AI; non-host clients receive synced state
         if (this.isHost) {
             // Find the nearest player for each enemy to chase (all players, not just local)
             this.enemies.forEach(enemy => {
                 const nearestPlayer = this.getNearestPlayer(enemy);
-                enemy.update(this.zone, nearestPlayer);
+                enemy.update(this.zone, nearestPlayer, dt);
             });
         }
         
@@ -347,8 +349,8 @@ class Game {
 
         this.localPlayer.attackAngle = attackAngle;
         this.localPlayer.angle = attackAngle;
-        this.localPlayer.attackCooldown = this.localPlayer.attackCooldownFrames;
-        this.localPlayer.attackAnimTimer = this.localPlayer.attackAnimTotal;
+        this.localPlayer.attackCooldown = this.localPlayer.attackCooldownDuration;
+        this.localPlayer.attackAnimTimer = this.localPlayer.attackAnimDuration;
 
         let sentDamage = false;
         this.enemies.forEach(enemy => {

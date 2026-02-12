@@ -1,16 +1,17 @@
 // Player class for adventure character
 
-// Constants
-const PLAYER_MAX_SPEED = 2.2;
-const PLAYER_ACCELERATION = 0.2;
-const PLAYER_FRICTION = 0.85;
+// Constants (time-based, units per second)
+const PLAYER_MAX_SPEED = 132;           // pixels per second (was 2.2 per frame * 60)
+const PLAYER_ACCELERATION = 800;        // pixels per second squared
+const PLAYER_FRICTION = 8;              // friction factor (higher = more friction)
 const PLAYER_DEFAULT_HP = 100;
 const PLAYER_ATTACK_DAMAGE = 20;
 const PLAYER_ATTACK_RANGE = 76;
 const PLAYER_ATTACK_ARC = Math.PI * 0.9;
-const PLAYER_ATTACK_COOLDOWN_FRAMES = 25;
-const PLAYER_ATTACK_ANIM_FRAMES = 12;
+const PLAYER_ATTACK_COOLDOWN = 0.417;   // seconds (was 25 frames / 60)
+const PLAYER_ATTACK_ANIM_DURATION = 0.2; // seconds (was 12 frames / 60)
 const PLAYER_SIZE = 20;
+const PLAYER_STUN_FRICTION = 12;        // higher friction when stunned
 
 class Player {
     /**
@@ -52,9 +53,9 @@ class Player {
         this.attackRange = PLAYER_ATTACK_RANGE;
         this.attackArc = PLAYER_ATTACK_ARC;
         this.attackCooldown = 0;
-        this.attackCooldownFrames = PLAYER_ATTACK_COOLDOWN_FRAMES;
+        this.attackCooldownDuration = PLAYER_ATTACK_COOLDOWN;  // seconds
         this.attackAnimTimer = 0;
-        this.attackAnimTotal = PLAYER_ATTACK_ANIM_FRAMES;
+        this.attackAnimDuration = PLAYER_ATTACK_ANIM_DURATION; // seconds
         this.attackAngle = 0;
 
         // Simple weapon model: handle + blade rendered from hand pivot.
@@ -77,21 +78,24 @@ class Player {
      * Update player physics and state
      * @param {Object} keys - Current keyboard state
      * @param {Zone} zone - Current zone for collision detection
+     * @param {number} dt - Delta time in seconds
      */
-    update(keys, zone) {
+    update(keys, zone, dt = 1/60) {
         // Handle stun effect
         if (this.stunned) {
-            this.stunnedTime--;
+            this.stunnedTime -= dt;
             if (this.stunnedTime <= 0) {
                 this.stunned = false;
             }
-            this.velocityX *= 0.9;
-            this.velocityY *= 0.9;
+            // Apply heavy friction when stunned (frame-rate independent)
+            const stunFriction = Math.exp(-PLAYER_STUN_FRICTION * dt);
+            this.velocityX *= stunFriction;
+            this.velocityY *= stunFriction;
         } else {
             // Handle movement (4-directional top-down)
             let moveX = 0;
             let moveY = 0;
-            
+
             if (keys['ArrowUp'] || keys['w']) {
                 moveY = -1;
             }
@@ -104,25 +108,26 @@ class Player {
             if (keys['ArrowRight'] || keys['d']) {
                 moveX = 1;
             }
-            
+
             // Normalize diagonal movement
             if (moveX !== 0 && moveY !== 0) {
                 moveX *= 0.707;
                 moveY *= 0.707;
             }
-            
+
             // Update facing angle and apply physics
             if (moveX !== 0 || moveY !== 0) {
                 this.angle = Math.atan2(moveY, moveX);
-                // Apply acceleration in movement direction
-                this.velocityX += moveX * this.acceleration;
-                this.velocityY += moveY * this.acceleration;
-            } else {
-                // Apply friction when not moving
-                this.velocityX *= this.friction;
-                this.velocityY *= this.friction;
+                // Apply acceleration (time-based)
+                this.velocityX += moveX * this.acceleration * dt;
+                this.velocityY += moveY * this.acceleration * dt;
             }
-            
+
+            // Apply friction (frame-rate independent exponential decay)
+            const frictionFactor = Math.exp(-this.friction * dt);
+            this.velocityX *= frictionFactor;
+            this.velocityY *= frictionFactor;
+
             // Cap velocity at maxSpeed
             const currentSpeed = Math.hypot(this.velocityX, this.velocityY);
             if (currentSpeed > this.maxSpeed) {
@@ -130,25 +135,26 @@ class Player {
                 this.velocityY = (this.velocityY / currentSpeed) * this.maxSpeed;
             }
         }
-        
+
+        // Update cooldowns (time-based)
         if (this.attackCooldown > 0) {
-            this.attackCooldown--;
+            this.attackCooldown -= dt;
         }
 
         if (this.attackAnimTimer > 0) {
-            this.attackAnimTimer--;
+            this.attackAnimTimer -= dt;
         }
-        
-        // Update speed for compatibility
-        this.speed = Math.hypot(this.velocityX, this.velocityY);
-        
+
+        // Update speed for network sync (normalized to ~0-3 range for compatibility)
+        this.speed = Math.hypot(this.velocityX, this.velocityY) / 60;
+
         // Store old position
         const oldX = this.x;
         const oldY = this.y;
-        
-        // Update position
-        this.x += this.velocityX;
-        this.y += this.velocityY;
+
+        // Update position (time-based)
+        this.x += this.velocityX * dt;
+        this.y += this.velocityY * dt;
 
         // Clamp to zone bounds
         if (zone) {
@@ -157,13 +163,13 @@ class Player {
             this.x = Math.max(halfW, Math.min(zone.width - halfW, this.x));
             this.y = Math.max(halfH, Math.min(zone.height - halfH, this.y));
         }
-        
+
         // Check area collision
         if (zone && zone.checkCollision(this)) {
             this.x = oldX;
             this.y = oldY;
         }
-        
+
         // Check area nodes
         if (zone) {
             zone.checkPlayerNode(this);
@@ -315,8 +321,8 @@ class Player {
 
         this.attackAngle = attackAngle;
         this.angle = attackAngle;
-        this.attackCooldown = this.attackCooldownFrames;
-        this.attackAnimTimer = this.attackAnimTotal;
+        this.attackCooldown = this.attackCooldownDuration;
+        this.attackAnimTimer = this.attackAnimDuration;
 
         let hit = false;
         enemies.forEach(enemy => {
@@ -343,7 +349,7 @@ class Player {
             return this.angle;
         }
 
-        const progress = 1 - (this.attackAnimTimer / this.attackAnimTotal);
+        const progress = 1 - (this.attackAnimTimer / this.attackAnimDuration);
         const startAngle = this.attackAngle - (this.attackArc * 0.55);
         return startAngle + (this.attackArc * progress);
     }
