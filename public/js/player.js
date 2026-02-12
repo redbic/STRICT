@@ -68,6 +68,10 @@ class Player {
         // Status
         this.stunned = false;
         this.stunnedTime = 0;
+
+        // Interpolation targets (used by remote players)
+        this.targetX = undefined;
+        this.targetY = undefined;
     }
     
     /**
@@ -146,6 +150,14 @@ class Player {
         // Update position
         this.x += this.velocityX;
         this.y += this.velocityY;
+
+        // Clamp to zone bounds
+        if (zone) {
+            const halfW = this.width / 2;
+            const halfH = this.height / 2;
+            this.x = Math.max(halfW, Math.min(zone.width - halfW, this.x));
+            this.y = Math.max(halfH, Math.min(zone.height - halfH, this.y));
+        }
         
         // Check area collision
         if (zone && zone.checkCollision(this)) {
@@ -366,12 +378,21 @@ class Player {
     }
     
     setState(state) {
-        this.x = state.x;
-        this.y = state.y;
+        // Store target state for interpolation
+        this.targetX = state.x;
+        this.targetY = state.y;
         this.angle = state.angle;
         this.speed = state.speed;
         this.zoneLevel = state.zoneLevel;
         this.position = state.position;
         this.stunned = state.stunned;
+    }
+
+    interpolateRemote(dt) {
+        if (this.targetX === undefined) return;
+        // Frame-rate independent interpolation: ~87% per 100ms at 60fps
+        const lerpFactor = 1 - Math.pow(0.001, dt);
+        this.x += (this.targetX - this.x) * lerpFactor;
+        this.y += (this.targetY - this.y) * lerpFactor;
     }
 }

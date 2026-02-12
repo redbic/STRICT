@@ -5,49 +5,74 @@ const path = require('path');
 const { Pool } = require('pg');
 const rateLimit = require('express-rate-limit');
 const currency = require('./server/currency');
+const { RoomManager, MAX_PARTY_SIZE } = require('./server/rooms');
+const {
+  normalizeSafeString,
+  isValidRoomId,
+  isValidPlayerId,
+  isValidUsername,
+  isValidPlayerState,
+  isValidZoneId,
+  sanitizeInventory,
+} = require('./server/validation');
 require('dotenv').config();
 
 const app = express();
 const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
+const wss = new WebSocket.Server({
+  server,
+  maxPayload: 64 * 1024, // 64 KB max message size
+});
 
 const PORT = process.env.PORT || 3000;
-const MAX_PARTY_SIZE = 6;
-const ENEMY_KILL_REWARD = 5; // coins per enemy killed
+const ENEMY_KILL_REWARD = 5;
 
-// PostgreSQL connection pool for Neon.tech
+// WebSocket rate limiting
+const WS_RATE_LIMIT_WINDOW_MS = 10000;
+const WS_RATE_LIMIT_MAX_MESSAGES = 100;
+
+// PostgreSQL connection pool
 let pool = null;
 if (process.env.DATABASE_URL) {
   pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
   });
 }
 
-// Serve static files
-app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.json());
+// Room manager
+const rooms = new RoomManager();
 
-// Rate limiting for API endpoints
+// Middleware
+app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.json({ limit: '16kb' }));
+
 const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
+  windowMs: 15 * 60 * 1000,
+  max: 100,
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
 });
-
-// Apply rate limiting to all API routes
 app.use('/api/', apiLimiter);
 
-// API Routes
+// Health check endpoint
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok' });
+});
+
+// --- API Routes ---
+
 app.post('/api/player', async (req, res) => {
-  if (!pool) {
-    return res.json({ success: true, player: { name: req.body.username, inventory_data: [] } });
+  const username = normalizeSafeString(req.body.username);
+  if (!username || !isValidUsername(username)) {
+    return res.status(400).json({ error: 'Invalid username' });
   }
-  
-  const { username } = req.body;
-  
+
+  if (!pool) {
+    return res.json({ success: true, player: { name: username, inventory_data: [] } });
+  }
+
   try {
     const result = await pool.query(`
       INSERT INTO players (name) 
@@ -56,7 +81,7 @@ app.post('/api/player', async (req, res) => {
       DO UPDATE SET name = EXCLUDED.name
       RETURNING id, name, balance, character_data, inventory_data
     `, [username]);
-    
+
     res.json({ success: true, player: result.rows[0] });
   } catch (error) {
     console.error('Player creation error:', error);
@@ -65,13 +90,13 @@ app.post('/api/player', async (req, res) => {
 });
 
 app.get('/api/profile', async (req, res) => {
-  if (!pool) {
-    return res.json({ name: req.query.name || '', balance: null, character: null, inventory: [] });
-  }
-
-  const name = String(req.query.name || '').trim();
+  const name = normalizeSafeString(req.query.name);
   if (!name) {
     return res.status(400).json({ error: 'Missing name' });
+  }
+
+  if (!pool) {
+    return res.json({ name, balance: null, character: null, inventory: [] });
   }
 
   try {
@@ -87,7 +112,7 @@ app.get('/api/profile', async (req, res) => {
       name: row.name,
       balance: row.balance !== null ? Number(row.balance) : null,
       character: row.character_data || null,
-      inventory: sanitizeInventory(row.inventory_data)
+      inventory: sanitizeInventory(row.inventory_data),
     });
   } catch (error) {
     console.error('Profile lookup error:', error);
@@ -95,34 +120,17 @@ app.get('/api/profile', async (req, res) => {
   }
 });
 
-// API endpoint for balance operations
-app.post('/api/balance/add', async (req, res) => {
-  const { username, amount, reason, metadata } = req.body;
-  
-  if (!username || typeof amount !== 'number') {
-    return res.status(400).json({ error: 'Invalid request' });
-  }
-  
-  const newBalance = await currency.addBalance(pool, username, amount, reason || 'manual', metadata || {});
-  
-  if (newBalance === null) {
-    return res.status(500).json({ error: 'Failed to update balance' });
-  }
-  
-  res.json({ success: true, balance: newBalance });
-});
-
 app.post('/api/inventory', async (req, res) => {
-  if (!pool) {
-    return res.json({ success: true, inventory: sanitizeInventory(req.body.inventory) });
-  }
-
   const username = normalizeSafeString(req.body.username);
   if (!username || !isValidUsername(username)) {
     return res.status(400).json({ error: 'Invalid username' });
   }
 
-  const sanitizedInventory = sanitizeInventory(req.body.inventory);
+  const sanitized = sanitizeInventory(req.body.inventory);
+
+  if (!pool) {
+    return res.json({ success: true, inventory: sanitized });
+  }
 
   try {
     const result = await pool.query(
@@ -130,7 +138,7 @@ app.post('/api/inventory', async (req, res) => {
        SET inventory_data = $2::jsonb
        WHERE name = $1
        RETURNING inventory_data`,
-      [username, JSON.stringify(sanitizedInventory)]
+      [username, JSON.stringify(sanitized)]
     );
 
     if (result.rows.length === 0) {
@@ -144,44 +152,10 @@ app.post('/api/inventory', async (req, res) => {
   }
 });
 
-// WebSocket game rooms
-const gameRooms = new Map();
-
-// Rate limiting constants for WebSocket
-const WS_RATE_LIMIT_WINDOW_MS = 10000; // 10 seconds
-const WS_RATE_LIMIT_MAX_MESSAGES = 100; // Max messages per window
-const MAX_ROOM_ID_LENGTH = 64;
-const MAX_PLAYER_ID_LENGTH = 64;
-const MAX_USERNAME_LENGTH = 32;
-const ROOM_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
-const PLAYER_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
-const USERNAME_PATTERN = /^[A-Za-z0-9 _-]+$/;
-const ALLOWED_ZONE_IDS = new Set(['hub', 'training', 'gallery']);
-const PLAYER_STATE_KEYS = new Set(['id', 'x', 'y', 'angle', 'speed', 'zoneLevel', 'position', 'username', 'stunned']);
-const INVENTORY_MAX_ITEMS = 16;
-
-function sanitizeInventory(rawInventory) {
-  if (!Array.isArray(rawInventory)) return [];
-
-  const sanitized = [];
-  for (const rawItem of rawInventory) {
-    if (!rawItem || typeof rawItem !== 'object' || Array.isArray(rawItem)) continue;
-
-    const id = normalizeSafeString(rawItem.id).slice(0, 64);
-    const name = normalizeSafeString(rawItem.name).slice(0, 48);
-    const icon = normalizeSafeString(rawItem.icon || '📦').slice(0, 8);
-    if (!id || !name) continue;
-
-    sanitized.push({ id, name, icon: icon || '📦' });
-    if (sanitized.length >= INVENTORY_MAX_ITEMS) break;
-  }
-
-  return sanitized;
-}
+// --- Database schema migration ---
 
 async function ensurePlayerSchema() {
   if (!pool) return;
-
   try {
     await pool.query(`
       ALTER TABLE players
@@ -192,131 +166,55 @@ async function ensurePlayerSchema() {
   }
 }
 
-function warnInvalidInput(type, reason) {
-  console.warn(`Rejected ${type}: ${reason}`);
-}
+// --- WebSocket handlers ---
 
-function normalizeSafeString(value) {
-  return typeof value === 'string' ? value.trim() : '';
-}
-
-function isSafeString(value, { minLength = 1, maxLength = 64, pattern = null } = {}) {
-  const normalized = normalizeSafeString(value);
-  if (normalized.length < minLength || normalized.length > maxLength) return false;
-  return pattern ? pattern.test(normalized) : true;
-}
-
-function isValidRoomId(roomId) {
-  return isSafeString(roomId, {
-    maxLength: MAX_ROOM_ID_LENGTH,
-    pattern: ROOM_ID_PATTERN
+function broadcastRoomList() {
+  const available = rooms.getAvailableRooms();
+  const message = JSON.stringify({ type: 'room_list', rooms: available });
+  wss.clients.forEach(client => {
+    if (client.readyState === WebSocket.OPEN && !client.roomId) {
+      try { client.send(message); } catch (_) { /* ignore */ }
+    }
   });
-}
-
-function isValidPlayerId(playerId) {
-  return isSafeString(playerId, {
-    maxLength: MAX_PLAYER_ID_LENGTH,
-    pattern: PLAYER_ID_PATTERN
-  });
-}
-
-function isValidUsername(username) {
-  return isSafeString(username, {
-    maxLength: MAX_USERNAME_LENGTH,
-    pattern: USERNAME_PATTERN
-  });
-}
-
-function isFiniteNumberInRange(value, min, max) {
-  return typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max;
-}
-
-function isValidPlayerState(state) {
-  if (!state || typeof state !== 'object' || Array.isArray(state)) return false;
-
-  const stateKeys = Object.keys(state);
-  if (stateKeys.some(key => !PLAYER_STATE_KEYS.has(key))) return false;
-
-  const validCoreFields =
-    isFiniteNumberInRange(state.x, -10000, 10000) &&
-    isFiniteNumberInRange(state.y, -10000, 10000) &&
-    isFiniteNumberInRange(state.angle, -Math.PI * 4, Math.PI * 4) &&
-    isFiniteNumberInRange(state.speed, 0, 100) &&
-    Number.isInteger(state.zoneLevel) && state.zoneLevel >= 1 && state.zoneLevel <= 100;
-
-  if (!validCoreFields) return false;
-  if (typeof state.stunned !== 'boolean') return false;
-  if (!Number.isInteger(state.position) || state.position < 0 || state.position > 16) return false;
-
-  if (state.id !== undefined && !isValidPlayerId(state.id)) return false;
-  if (state.username !== undefined && !isValidUsername(state.username)) return false;
-
-  return true;
-}
-
-function isValidZoneId(zoneId) {
-  return isSafeString(zoneId, { maxLength: 32, pattern: ROOM_ID_PATTERN }) && ALLOWED_ZONE_IDS.has(zoneId);
 }
 
 wss.on('connection', (ws) => {
-  console.log('New WebSocket connection');
-  
-  // Initialize rate limiting for this connection
   ws.messageCount = 0;
   ws.lastReset = Date.now();
-  
+
   ws.on('message', (message) => {
     try {
-      // Rate limiting check
+      // Rate limiting
       const now = Date.now();
       if (now - ws.lastReset > WS_RATE_LIMIT_WINDOW_MS) {
         ws.messageCount = 0;
         ws.lastReset = now;
       }
-      
       ws.messageCount++;
       if (ws.messageCount > WS_RATE_LIMIT_MAX_MESSAGES) {
-        console.warn(`Rate limit exceeded for connection, closing`);
+        console.warn('Rate limit exceeded for connection, closing');
         ws.close(1008, 'Rate limit exceeded');
         return;
       }
-      
+
       const data = JSON.parse(message);
-      
+
       switch (data.type) {
-        case 'join_room':
-          handleJoinRoom(ws, data);
-          break;
-        case 'leave_room':
-          handleLeaveRoom(ws, data);
-          break;
-        case 'player_update':
-          handlePlayerUpdate(ws, data);
-          break;
-        case 'game_start':
-          handleGameStart(ws, data);
-          break;
-        case 'zone_enter':
-          handleZoneEnter(ws, data);
-          break;
-        case 'enemy_killed':
-          handleEnemyKilled(ws, data);
-          break;
-        case 'enemy_sync':
-          handleEnemySync(ws, data);
-          break;
-        case 'enemy_damage':
-          handleEnemyDamage(ws, data);
-          break;
-        case 'list_rooms':
-          handleListRooms(ws);
-          break;
+        case 'join_room':    handleJoinRoom(ws, data);    break;
+        case 'leave_room':   handleLeaveRoom(ws);         break;
+        case 'player_update': handlePlayerUpdate(ws, data); break;
+        case 'game_start':   handleGameStart(ws);          break;
+        case 'zone_enter':   handleZoneEnter(ws, data);   break;
+        case 'enemy_killed': handleEnemyKilled(ws, data); break;
+        case 'enemy_sync':   handleEnemySync(ws, data);   break;
+        case 'enemy_damage': handleEnemyDamage(ws, data); break;
+        case 'list_rooms':   handleListRooms(ws);         break;
       }
     } catch (error) {
       console.error('WebSocket message error:', error);
     }
   });
-  
+
   ws.on('close', () => {
     handleDisconnect(ws);
   });
@@ -325,405 +223,240 @@ wss.on('connection', (ws) => {
 function handleJoinRoom(ws, data) {
   const { roomId, playerId, username } = data;
 
-  if (!isValidRoomId(roomId)) {
-    warnInvalidInput('join_room', 'invalid roomId');
-    return;
-  }
-  if (!isValidPlayerId(playerId)) {
-    warnInvalidInput('join_room', 'invalid playerId');
-    return;
-  }
-  if (!isValidUsername(username)) {
-    warnInvalidInput('join_room', 'invalid username');
+  if (!isValidRoomId(roomId) || !isValidPlayerId(playerId) || !isValidUsername(username)) {
     return;
   }
 
-  const normalizedRoomId = normalizeSafeString(roomId);
-  const normalizedPlayerId = normalizeSafeString(playerId);
-  const normalizedUsername = normalizeSafeString(username);
-  
-  if (!gameRooms.has(normalizedRoomId)) {
-    gameRooms.set(normalizedRoomId, {
-      players: [],
-      started: false,
-      killedEnemies: new Set(), // Track killed enemies to prevent double-rewards
-      respawnTimers: new Map(), // Track respawn timers for enemies
-      hostId: null // Track the host player for enemy sync
-    });
+  const nRoomId = normalizeSafeString(roomId);
+  const nPlayerId = normalizeSafeString(playerId);
+  const nUsername = normalizeSafeString(username);
+
+  if (!rooms.hasRoom(nRoomId)) {
+    rooms.createRoom(nRoomId);
   }
-  
-  const room = gameRooms.get(normalizedRoomId);
-  if (room.players.some(player => player.id === normalizedPlayerId)) {
-    warnInvalidInput('join_room', 'duplicate playerId in room');
-    return;
-  }
+
+  const room = rooms.getRoom(nRoomId);
+  if (room.players.some(p => p.id === nPlayerId)) return;
 
   if (room.players.length >= MAX_PARTY_SIZE) {
     ws.send(JSON.stringify({ type: 'room_full', maxPlayers: MAX_PARTY_SIZE }));
     return;
   }
-  
-  // Add player to room
+
   const player = {
-    id: normalizedPlayerId,
-    username: normalizedUsername,
-    ws: ws,
+    id: nPlayerId,
+    username: nUsername,
+    ws,
     ready: false,
-    zone: 'hub' // Track which zone each player is in
+    zone: 'hub',
   };
-  
-  room.players.push(player);
-  ws.roomId = normalizedRoomId;
-  ws.playerId = normalizedPlayerId;
-  ws.username = normalizedUsername; // Store username on WebSocket object
-  
-  // Assign host if none exists (first player becomes host)
-  if (!room.hostId) {
-    room.hostId = normalizedPlayerId;
-  }
-  
-  // Notify all players in room
-  broadcastToRoom(normalizedRoomId, {
+
+  rooms.addPlayer(nRoomId, player);
+  ws.roomId = nRoomId;
+  ws.playerId = nPlayerId;
+  ws.username = nUsername;
+
+  rooms.broadcastToRoom(nRoomId, {
     type: 'room_update',
-    players: room.players.map(p => ({ id: p.id, username: p.username, ready: p.ready, zone: p.zone })),
-    roomId: normalizedRoomId,
-    hostId: room.hostId
+    players: rooms.getPlayerRoster(room),
+    roomId: nRoomId,
+    hostId: room.hostId,
   });
-  
-  // If game already started, tell the new player to start immediately
+
   if (room.started) {
-    ws.send(JSON.stringify({
-      type: 'game_start',
-      timestamp: Date.now()
-    }));
+    ws.send(JSON.stringify({ type: 'game_start', timestamp: Date.now() }));
   }
-  
-  // Notify unjoined clients about updated room list
+
   broadcastRoomList();
 }
 
-function handleLeaveRoom(ws, data) {
-  if (ws.roomId) {
-    const room = gameRooms.get(ws.roomId);
-    if (room) {
-      room.players = room.players.filter(p => p.id !== ws.playerId);
-      
-      if (room.players.length === 0) {
-        // Clear all respawn timers before deleting the room
-        if (room.respawnTimers) {
-          room.respawnTimers.forEach(timer => clearTimeout(timer));
-        }
-        gameRooms.delete(ws.roomId);
-      } else {
-        // Reassign host if the leaving player was the host
-        if (room.hostId === ws.playerId) {
-          room.hostId = room.players[0].id;
-          broadcastToRoom(ws.roomId, {
-            type: 'host_assigned',
-            hostId: room.hostId
-          });
-        }
-        
-        broadcastToRoom(ws.roomId, {
-          type: 'room_update',
-          players: room.players.map(p => ({ id: p.id, username: p.username, ready: p.ready, zone: p.zone })),
-          hostId: room.hostId
-        });
-      }
+function handleLeaveRoom(ws) {
+  if (!ws.roomId) return;
+
+  const result = rooms.removePlayer(ws.roomId, ws.playerId);
+  if (result) {
+    const { room, newHostId } = result;
+    if (newHostId) {
+      rooms.broadcastToRoom(ws.roomId, { type: 'host_assigned', hostId: newHostId });
     }
-    
-    // Notify unjoined clients about updated room list
-    broadcastRoomList();
-    
-    ws.roomId = null;
-    ws.playerId = null;
+    rooms.broadcastToRoom(ws.roomId, {
+      type: 'room_update',
+      players: rooms.getPlayerRoster(room),
+      hostId: room.hostId,
+    });
   }
+
+  broadcastRoomList();
+  ws.roomId = null;
+  ws.playerId = null;
 }
 
 function handlePlayerUpdate(ws, data) {
-  if (ws.roomId) {
-    const room = gameRooms.get(ws.roomId);
-    if (!room) return;
+  if (!ws.roomId) return;
+  const room = rooms.getRoom(ws.roomId);
+  if (!room) return;
 
-    if (!isValidPlayerState(data.state)) {
-      warnInvalidInput('player_update', 'invalid player state');
-      return;
+  if (!isValidPlayerState(data.state)) return;
+
+  const sender = room.players.find(p => p.id === ws.playerId);
+  if (!sender) return;
+
+  // Pre-serialize once for all recipients
+  const payload = JSON.stringify({
+    type: 'player_state',
+    playerId: ws.playerId,
+    state: data.state,
+  });
+
+  room.players.forEach(player => {
+    if (player.ws !== ws && player.ws.readyState === WebSocket.OPEN && player.zone === sender.zone) {
+      player.ws.send(payload);
     }
-
-    // Find the sending player to determine their zone
-    const sender = room.players.find(p => p.id === ws.playerId);
-    if (!sender) return;
-    const senderZone = sender.zone;
-
-    // Only send player state to other players in the same zone
-    room.players.forEach(player => {
-      if (player.ws !== ws && player.ws.readyState === WebSocket.OPEN && player.zone === senderZone) {
-        player.ws.send(JSON.stringify({
-          type: 'player_state',
-          playerId: ws.playerId,
-          state: data.state
-        }));
-      }
-    });
-  }
+  });
 }
 
-function handleGameStart(ws, data) {
-  if (ws.roomId) {
-    const room = gameRooms.get(ws.roomId);
-    if (room) {
-      room.started = true;
-      broadcastToRoom(ws.roomId, {
-        type: 'game_start',
-        timestamp: Date.now()
-      });
-      
-      // Update room list to reflect started status
-      broadcastRoomList();
-    }
-  }
+function handleGameStart(ws) {
+  if (!ws.roomId) return;
+  const room = rooms.getRoom(ws.roomId);
+  if (!room) return;
+
+  room.started = true;
+  rooms.broadcastToRoom(ws.roomId, { type: 'game_start', timestamp: Date.now() });
+  broadcastRoomList();
 }
 
 function handleZoneEnter(ws, data) {
-  if (ws.roomId && data.zoneId) {
-    const normalizedZoneId = normalizeSafeString(data.zoneId);
+  if (!ws.roomId || !data.zoneId) return;
+  const zoneId = normalizeSafeString(data.zoneId);
+  if (!isValidZoneId(zoneId)) return;
 
-    if (!isValidZoneId(normalizedZoneId)) {
-      warnInvalidInput('zone_enter', 'invalid zoneId');
-      return;
-    }
+  const room = rooms.getRoom(ws.roomId);
+  if (!room) return;
 
-    const room = gameRooms.get(ws.roomId);
-    if (room) {
-      // Update this player's zone on the server
-      const player = room.players.find(p => p.id === ws.playerId);
-      if (player) {
-        player.zone = normalizedZoneId;
-      }
+  const player = room.players.find(p => p.id === ws.playerId);
+  if (player) player.zone = zoneId;
 
-      // Collect players already in the target zone (excluding the transitioning player)
-      const zoneMates = room.players
-        .filter(p => p.zone === normalizedZoneId && p.id !== ws.playerId)
-        .map(p => ({ id: p.id, username: p.username, zone: p.zone }));
+  const zoneMates = room.players
+    .filter(p => p.zone === zoneId && p.id !== ws.playerId)
+    .map(p => ({ id: p.id, username: p.username, zone: p.zone }));
 
-      // Only send the zone transition back to the player who entered the portal
-      ws.send(JSON.stringify({
-        type: 'zone_enter',
-        zoneId: normalizedZoneId,
-        playerId: ws.playerId,
-        zonePlayers: zoneMates
-      }));
-    }
-  }
+  ws.send(JSON.stringify({
+    type: 'zone_enter',
+    zoneId,
+    playerId: ws.playerId,
+    zonePlayers: zoneMates,
+  }));
 }
 
 async function handleEnemyKilled(ws, data) {
   const { enemyId, zone } = data;
-  const normalizedZone = typeof zone === 'string' ? zone.trim().toLowerCase() : '';
-  const zoneKey = normalizedZone || 'unknown'; // Zone values are canonical zone keys, not display names.
-  
-  if (!ws.roomId || !ws.username || !enemyId) {
-    return;
-  }
-  
-  const room = gameRooms.get(ws.roomId);
-  if (!room) {
-    return;
-  }
-  
-  // Check if this enemy has already been rewarded
+  const zoneKey = (typeof zone === 'string' ? zone.trim().toLowerCase() : '') || 'unknown';
+
+  if (!ws.roomId || !ws.username || !enemyId) return;
+
+  const room = rooms.getRoom(ws.roomId);
+  if (!room) return;
+
   const enemyKey = `${zoneKey}-${enemyId}`;
-  if (room.killedEnemies.has(enemyKey)) {
-    console.log(`Enemy ${enemyKey} already rewarded, skipping`);
-    return;
-  }
-  
-  // Mark enemy as killed
+  if (room.killedEnemies.has(enemyKey)) return;
+
   room.killedEnemies.add(enemyKey);
-  
-  // Award coins
+
   const newBalance = await currency.addBalance(
-    pool, 
-    ws.username, 
-    ENEMY_KILL_REWARD, 
-    'enemy_kill',
+    pool, ws.username, ENEMY_KILL_REWARD, 'enemy_kill',
     { game: 'strict1000', enemy: enemyId, zone: zoneKey }
   );
-  
+
   if (newBalance !== null) {
-    // Send balance update to the player
-    ws.send(JSON.stringify({
-      type: 'balance_update',
-      balance: newBalance
-    }));
+    ws.send(JSON.stringify({ type: 'balance_update', balance: newBalance }));
   }
-  
-  // Schedule enemy respawn for training dummies (10 second timer)
+
+  // Respawn timer for training zone
   if (zoneKey === 'training') {
-    const respawnDelay = 10000; // 10 seconds
-    
-    // Clear any existing timer for this enemy
+    const respawnDelay = 10000;
     if (room.respawnTimers.has(enemyKey)) {
       clearTimeout(room.respawnTimers.get(enemyKey));
     }
-    
-    // Schedule respawn
+
+    const roomId = ws.roomId;
     const timerId = setTimeout(() => {
-      // Check if room still exists
-      const currentRoom = gameRooms.get(ws.roomId);
+      const currentRoom = rooms.getRoom(roomId);
       if (!currentRoom) return;
-      
-      // Remove from killed enemies so it can be killed again
+
       currentRoom.killedEnemies.delete(enemyKey);
-      
-      // Broadcast respawn to all players in room
-      broadcastToRoom(ws.roomId, {
+      rooms.broadcastToRoom(roomId, {
         type: 'enemy_respawn',
-        enemyId: enemyId,
-        zone: zoneKey
+        enemyId,
+        zone: zoneKey,
       });
-      
-      // Clean up timer reference
       currentRoom.respawnTimers.delete(enemyKey);
     }, respawnDelay);
-    
+
     room.respawnTimers.set(enemyKey, timerId);
   }
 }
 
 function handleEnemySync(ws, data) {
   if (!ws.roomId || !Array.isArray(data.enemies)) return;
-  
-  const room = gameRooms.get(ws.roomId);
-  if (!room) return;
-  
-  // Only accept enemy sync from the host
-  if (ws.playerId !== room.hostId) return;
 
-  // Find the host's zone
+  const room = rooms.getRoom(ws.roomId);
+  if (!room || ws.playerId !== room.hostId) return;
+
   const host = room.players.find(p => p.id === room.hostId);
   const hostZone = host ? host.zone : null;
-  
-  // Broadcast enemy state only to non-host players in the same zone
+
+  // Pre-serialize once
+  const payload = JSON.stringify({ type: 'enemy_sync', enemies: data.enemies });
+
   room.players.forEach(player => {
     if (player.ws !== ws && player.ws.readyState === WebSocket.OPEN && player.zone === hostZone) {
-      player.ws.send(JSON.stringify({
-        type: 'enemy_sync',
-        enemies: data.enemies
-      }));
+      player.ws.send(payload);
     }
   });
 }
 
 function handleEnemyDamage(ws, data) {
   if (!ws.roomId || !data.enemyId || typeof data.damage !== 'number') return;
-  
-  // Validate damage is within reasonable bounds (prevent cheating)
-  if (data.damage < 0 || data.damage > 100) {
-    console.warn(`Invalid damage amount from ${ws.playerId}: ${data.damage}`);
-    return;
-  }
-  
-  const room = gameRooms.get(ws.roomId);
+  if (data.damage < 0 || data.damage > 100) return;
+
+  const room = rooms.getRoom(ws.roomId);
   if (!room || !room.hostId) return;
 
-  // Only forward damage if the sender is in the same zone as the host
   const sender = room.players.find(p => p.id === ws.playerId);
   const host = room.players.find(p => p.id === room.hostId);
   if (!sender || !host || sender.zone !== host.zone) return;
-  
-  // Forward damage to the host player
+
   if (host.ws.readyState === WebSocket.OPEN) {
     host.ws.send(JSON.stringify({
       type: 'enemy_damage',
       enemyId: data.enemyId,
       damage: data.damage,
-      attackerId: ws.playerId
+      attackerId: ws.playerId,
     }));
   }
 }
 
 function handleDisconnect(ws) {
-  if (ws.roomId) {
-    const room = gameRooms.get(ws.roomId);
-    if (room) {
-      room.players = room.players.filter(p => p.ws !== ws);
-      
-      if (room.players.length === 0) {
-        // Clear all respawn timers before deleting the room
-        if (room.respawnTimers) {
-          room.respawnTimers.forEach(timer => clearTimeout(timer));
-        }
-        gameRooms.delete(ws.roomId);
-      } else {
-        // Reassign host if the disconnected player was the host
-        if (room.hostId === ws.playerId) {
-          room.hostId = room.players[0].id;
-          // Notify all remaining players about new host
-          broadcastToRoom(ws.roomId, {
-            type: 'host_assigned',
-            hostId: room.hostId
-          });
-        }
-        
-        broadcastToRoom(ws.roomId, {
-          type: 'player_left',
-          playerId: ws.playerId
-        });
-      }
-      
-      // Notify unjoined clients about updated room list
-      broadcastRoomList();
+  if (!ws.roomId) return;
+
+  const roomId = ws.roomId;
+  const result = rooms.removePlayerByWs(roomId, ws);
+
+  if (result) {
+    const { newHostId } = result;
+    if (newHostId) {
+      rooms.broadcastToRoom(roomId, { type: 'host_assigned', hostId: newHostId });
     }
+    rooms.broadcastToRoom(roomId, { type: 'player_left', playerId: ws.playerId });
   }
+
+  broadcastRoomList();
+  ws.roomId = null;
+  ws.playerId = null;
 }
 
 function handleListRooms(ws) {
-  ws.send(JSON.stringify({
-    type: 'room_list',
-    rooms: getAvailableRooms()
-  }));
-}
-
-function getAvailableRooms() {
-  const rooms = [];
-  for (const [roomId, room] of gameRooms) {
-    if (room.players.length < MAX_PARTY_SIZE) {
-      rooms.push({
-        roomId: roomId,
-        playerCount: room.players.length,
-        maxPlayers: MAX_PARTY_SIZE,
-        players: room.players.map(p => p.username),
-        started: room.started
-      });
-    }
-  }
-  return rooms;
-}
-
-function broadcastRoomList() {
-  const rooms = getAvailableRooms();
-  const message = JSON.stringify({ type: 'room_list', rooms: rooms });
-  wss.clients.forEach(client => {
-    if (client.readyState === WebSocket.OPEN && !client.roomId) {
-      try {
-        client.send(message);
-      } catch (err) {
-        // Ignore individual send failures
-      }
-    }
-  });
-}
-
-function broadcastToRoom(roomId, message, excludeWs = null) {
-  const room = gameRooms.get(roomId);
-  if (!room) return;
-  
-  room.players.forEach(player => {
-    if (player.ws !== excludeWs && player.ws.readyState === WebSocket.OPEN) {
-      player.ws.send(JSON.stringify(message));
-    }
-  });
+  ws.send(JSON.stringify({ type: 'room_list', rooms: rooms.getAvailableRooms() }));
 }
 
 // Start server
