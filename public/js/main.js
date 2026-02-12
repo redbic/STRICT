@@ -270,6 +270,9 @@ function stopEnemySyncInterval() {
 async function startRoomBrowsing() {
     stopRoomBrowsing();
     
+    const browserEl = document.getElementById('roomBrowser');
+    if (browserEl) browserEl.style.display = 'block';
+    
     browseManager = new NetworkManager();
     try {
         await browseManager.connect();
@@ -277,11 +280,9 @@ async function startRoomBrowsing() {
             renderRoomList(data.rooms || []);
         };
         browseManager.requestRoomList();
-        
-        const browserEl = document.getElementById('roomBrowser');
-        if (browserEl) browserEl.style.display = 'block';
     } catch (error) {
         console.error('Failed to connect for room browsing:', error);
+        renderRoomList([]);
     }
 }
 
@@ -290,6 +291,8 @@ function stopRoomBrowsing() {
         browseManager.disconnect();
         browseManager = null;
     }
+    const browserEl = document.getElementById('roomBrowser');
+    if (browserEl) browserEl.style.display = 'none';
 }
 
 function renderRoomList(rooms) {

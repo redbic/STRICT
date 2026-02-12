@@ -436,7 +436,11 @@ function broadcastRoomList() {
   const message = JSON.stringify({ type: 'room_list', rooms: rooms });
   wss.clients.forEach(client => {
     if (client.readyState === WebSocket.OPEN && !client.roomId) {
-      client.send(message);
+      try {
+        client.send(message);
+      } catch (err) {
+        // Ignore individual send failures
+      }
     }
   });
 }
