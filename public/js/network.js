@@ -38,9 +38,8 @@ class NetworkManager {
                 reject(error);
             };
             
-            this.ws.onclose = (event) => {
-                console.log('WebSocket closed', { code: event.code, reason: event.reason, wasClean: event.wasClean });
-                console.trace('WebSocket close stack trace');
+            this.ws.onclose = () => {
+                console.log('WebSocket closed');
                 this.connected = false;
             };
             
@@ -143,11 +142,7 @@ class NetworkManager {
     }
 
     enterZone(zoneId) {
-        console.log('NetworkManager.enterZone:', zoneId, 'connected:', this.connected);
-        if (!this.connected) {
-            console.error('Cannot enter zone - not connected');
-            return;
-        }
+        if (!this.connected) return;
         this.send({
             type: 'zone_enter',
             zoneId: zoneId

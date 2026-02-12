@@ -51,7 +51,7 @@ const WS_MAX_CONNECTIONS_PER_IP = 5;
 
 // WebSocket rate limiting
 const WS_RATE_LIMIT_WINDOW_MS = 10000;
-const WS_RATE_LIMIT_MAX_MESSAGES = 100;
+const WS_RATE_LIMIT_MAX_MESSAGES = 300; // Increased to support player updates + enemy sync
 const wsConnectionsByIp = new Map();
 const WS_IP_CLEANUP_INTERVAL_MS = 60000; // Clean up stale IP entries every 60s
 

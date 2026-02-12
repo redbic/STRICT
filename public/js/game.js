@@ -524,7 +524,6 @@ class Game {
             return;
         }
 
-        console.log('Portal triggered:', portal.id, 'onPortalEnter:', !!this.onPortalEnter);
         if (this.onPortalEnter) {
             this.onPortalEnter(portal.id);
         } else {
