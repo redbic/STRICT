@@ -372,6 +372,71 @@ class Game {
         });
 
         this.drawAttackFx();
+        
+        // Apply darkness overlay for The Gallery (ruleset: darkness)
+        if (this.zone && this.zone.ruleset === 'darkness' && this.localPlayer) {
+            this.drawDarknessOverlay();
+        }
+    }
+    
+    drawDarknessOverlay() {
+        if (!this.zone.visibilityRadius) return;
+        
+        const playerScreenX = this.localPlayer.x - this.cameraX;
+        const playerScreenY = this.localPlayer.y - this.cameraY;
+        
+        // Save context
+        this.ctx.save();
+        
+        // Create a radial gradient for the visibility circle
+        const gradient = this.ctx.createRadialGradient(
+            playerScreenX, playerScreenY, 0,
+            playerScreenX, playerScreenY, this.zone.visibilityRadius
+        );
+        gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+        gradient.addColorStop(0.7, 'rgba(0, 0, 0, 0.3)');
+        gradient.addColorStop(1, 'rgba(0, 0, 0, 0.95)');
+        
+        // Draw darkness over everything
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.95)';
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        // Cut out the visibility circle using compositing
+        this.ctx.globalCompositeOperation = 'destination-out';
+        this.ctx.fillStyle = gradient;
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        // Restore context
+        this.ctx.globalCompositeOperation = 'source-over';
+        
+        // Draw glowing dots for other players
+        this.players.forEach(player => {
+            if (player.id === this.localPlayer.id) return; // Skip local player
+            
+            const otherScreenX = player.x - this.cameraX;
+            const otherScreenY = player.y - this.cameraY;
+            
+            // Glowing dot for co-op partners
+            this.ctx.fillStyle = 'rgba(100, 200, 255, 0.8)';
+            this.ctx.beginPath();
+            this.ctx.arc(otherScreenX, otherScreenY, 8, 0, Math.PI * 2);
+            this.ctx.fill();
+            
+            // Glow effect
+            const playerGlow = this.ctx.createRadialGradient(
+                otherScreenX, otherScreenY, 0,
+                otherScreenX, otherScreenY, 30
+            );
+            playerGlow.addColorStop(0, 'rgba(100, 200, 255, 0.5)');
+            playerGlow.addColorStop(1, 'rgba(100, 200, 255, 0)');
+            
+            this.ctx.fillStyle = playerGlow;
+            this.ctx.beginPath();
+            this.ctx.arc(otherScreenX, otherScreenY, 30, 0, Math.PI * 2);
+            this.ctx.fill();
+        });
+        
+        this.ctx.restore();
     }
 
     drawAttackFx() {
