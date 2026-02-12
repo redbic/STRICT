@@ -270,8 +270,9 @@ function setupNetworkHandlers() {
     };
     
     networkManager.onEnemyDamage = (data) => {
-        // Host receives damage reports from other players
-        if (game && game.isHost && data.enemyId && typeof data.damage === 'number') {
+        // Host or zone host receives damage reports from other players
+        const isAuthoritative = game && (game.isHost || game.isZoneHost);
+        if (isAuthoritative && data.enemyId && typeof data.damage === 'number') {
             const enemy = game.enemies.find(e => e.id === data.enemyId);
             if (enemy) {
                 enemy.takeDamage(data.damage);
@@ -314,10 +315,9 @@ function updateHostStatus(hostId) {
 function updateZoneHostStatus() {
     if (!game || !networkManager) return;
 
-    // If we're the main host, we're always the zone host
+    // If we're the main host, we're authoritative for our zone
     if (game.isHost) {
         game.isZoneHost = false; // isHost takes precedence
-        console.log('Zone host status: isHost=true, isZoneHost=false');
         return;
     }
 
@@ -326,16 +326,28 @@ function updateZoneHostStatus() {
     const hostPlayer = currentRoomPlayers.find(p => p.id === currentHostId);
     const hostZone = hostPlayer ? hostPlayer.zone : 'hub';
 
-    // We're zone host if the main host is in a different zone
     const wasZoneHost = game.isZoneHost;
-    game.isZoneHost = (hostZone !== localZone);
 
-    console.log('Zone host status:', { localZone, hostZone, isZoneHost: game.isZoneHost, hostPlayerId: currentHostId });
+    // If host is in our zone, we're not zone host
+    if (hostZone === localZone) {
+        game.isZoneHost = false;
+    } else {
+        // Host is in a different zone - select ONE zone host deterministically
+        // The player with the smallest ID in this zone becomes zone host
+        const playersInMyZone = currentRoomPlayers
+            .filter(p => p.zone === localZone && p.id !== currentHostId)
+            .sort((a, b) => a.id.localeCompare(b.id));
 
-    // Start/stop enemy sync based on zone host status
+        const zoneHostId = playersInMyZone.length > 0 ? playersInMyZone[0].id : null;
+        game.isZoneHost = (zoneHostId === networkManager.playerId);
+    }
+
+    // Start/stop enemy sync based on zone host status change
     if (game.isZoneHost && !wasZoneHost) {
+        console.log('Became zone host for zone:', localZone);
         startEnemySyncInterval();
     } else if (!game.isZoneHost && wasZoneHost && !game.isHost) {
+        console.log('Lost zone host status');
         stopEnemySyncInterval();
     }
 }
@@ -343,7 +355,9 @@ function updateZoneHostStatus() {
 function startEnemySyncInterval() {
     stopEnemySyncInterval();
     enemySyncInterval = setInterval(() => {
-        if (game && game.running && game.isHost && networkManager && networkManager.connected) {
+        // Both main host and zone host should send enemy syncs
+        const isAuthoritative = game && game.running && (game.isHost || game.isZoneHost);
+        if (isAuthoritative && networkManager && networkManager.connected) {
             if (game.enemies.length > 0) {
                 networkManager.sendEnemySync(game.enemies.map(e => ({
                     id: e.id,

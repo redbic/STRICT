@@ -580,16 +580,26 @@ function handleEnemySync(ws, data) {
   if (data.enemies.length > WS_MAX_ENEMY_SYNC_COUNT) return;
 
   const room = rooms.getRoom(ws.roomId);
-  if (!room || ws.playerId !== room.hostId) return;
+  if (!room) return;
+
+  const sender = room.players.find(p => p.id === ws.playerId);
+  if (!sender) return;
 
   const host = room.players.find(p => p.id === room.hostId);
   const hostZone = host ? host.zone : null;
 
-  // Pre-serialize once
+  // Allow sync from main host, or from zone hosts (players in zones without the host)
+  const isMainHost = ws.playerId === room.hostId;
+  const isZoneHost = sender.zone !== hostZone;
+
+  if (!isMainHost && !isZoneHost) return;
+
+  // Sync to players in the sender's zone
+  const senderZone = sender.zone;
   const payload = JSON.stringify({ type: 'enemy_sync', enemies: data.enemies });
 
   room.players.forEach(player => {
-    if (player.ws !== ws && player.ws.readyState === WebSocket.OPEN && player.zone === hostZone) {
+    if (player.ws !== ws && player.ws.readyState === WebSocket.OPEN && player.zone === senderZone) {
       player.ws.send(payload);
     }
   });
@@ -600,18 +610,41 @@ function handleEnemyDamage(ws, data) {
   if (data.damage < 0 || data.damage > 100) return;
 
   const room = rooms.getRoom(ws.roomId);
-  if (!room || !room.hostId) return;
+  if (!room) return;
 
   const sender = room.players.find(p => p.id === ws.playerId);
-  const host = room.players.find(p => p.id === room.hostId);
-  if (!sender || !host || sender.zone !== host.zone) return;
+  if (!sender) return;
 
-  safeSend(host.ws, {
-    type: 'enemy_damage',
-    enemyId: data.enemyId,
-    damage: data.damage,
-    attackerId: ws.playerId,
-  });
+  const host = room.players.find(p => p.id === room.hostId);
+  const hostZone = host ? host.zone : null;
+
+  // If main host is in the same zone, route to them
+  if (host && sender.zone === hostZone) {
+    safeSend(host.ws, {
+      type: 'enemy_damage',
+      enemyId: data.enemyId,
+      damage: data.damage,
+      attackerId: ws.playerId,
+    });
+    return;
+  }
+
+  // Otherwise, find the zone host (smallest ID in sender's zone, excluding main host)
+  const playersInZone = room.players
+    .filter(p => p.zone === sender.zone && p.id !== room.hostId)
+    .sort((a, b) => a.id.localeCompare(b.id));
+
+  const zoneHost = playersInZone.length > 0 ? playersInZone[0] : null;
+
+  // Route damage to zone host (if they exist and aren't the sender)
+  if (zoneHost && zoneHost.id !== ws.playerId) {
+    safeSend(zoneHost.ws, {
+      type: 'enemy_damage',
+      enemyId: data.enemyId,
+      damage: data.damage,
+      attackerId: ws.playerId,
+    });
+  }
 }
 
 function handleDisconnect(ws) {
