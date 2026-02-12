@@ -256,7 +256,9 @@ function setupNetworkHandlers() {
     };
     
     networkManager.onEnemySync = (data) => {
-        if (game && !game.isHost) {
+        // Only apply enemy sync if we're not running our own enemy AI
+        if (game && !game.isHost && !game.isZoneHost) {
+            console.log('Applying enemy sync:', data.enemies?.length, 'enemies');
             game.applyEnemySync(data.enemies);
         }
     };
@@ -315,6 +317,7 @@ function updateZoneHostStatus() {
     // If we're the main host, we're always the zone host
     if (game.isHost) {
         game.isZoneHost = false; // isHost takes precedence
+        console.log('Zone host status: isHost=true, isZoneHost=false');
         return;
     }
 
@@ -326,6 +329,8 @@ function updateZoneHostStatus() {
     // We're zone host if the main host is in a different zone
     const wasZoneHost = game.isZoneHost;
     game.isZoneHost = (hostZone !== localZone);
+
+    console.log('Zone host status:', { localZone, hostZone, isZoneHost: game.isZoneHost, hostPlayerId: currentHostId });
 
     // Start/stop enemy sync based on zone host status
     if (game.isZoneHost && !wasZoneHost) {
