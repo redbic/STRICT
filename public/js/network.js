@@ -16,6 +16,7 @@ class NetworkManager {
         this.onEnemySync = null; // Callback for enemy state sync
         this.onHostAssigned = null; // Callback for host assignment
         this.onEnemyDamage = null; // Callback for enemy damage (received by host)
+        this.onRoomList = null; // Callback for available room list
     }
     
     connect() {
@@ -86,6 +87,9 @@ class NetworkManager {
                 break;
             case 'enemy_damage':
                 if (this.onEnemyDamage) this.onEnemyDamage(data);
+                break;
+            case 'room_list':
+                if (this.onRoomList) this.onRoomList(data);
                 break;
         }
     }
@@ -164,6 +168,11 @@ class NetworkManager {
             enemyId: enemyId,
             damage: damage
         });
+    }
+    
+    requestRoomList() {
+        if (!this.connected) return;
+        this.send({ type: 'list_rooms' });
     }
     
     send(data) {

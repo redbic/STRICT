@@ -6,6 +6,8 @@ let currentRoomPlayers = [];
 let currentProfile = null;
 let playerUpdateInterval = null; // Track interval to prevent leaks
 let enemySyncInterval = null; // Track enemy sync interval
+let currentHostId = null; // Track the current host ID across game creation
+let browseManager = null; // Separate connection for browsing room list
 
 // Helper function to update balance display
 function updateBalanceDisplay(balance) {
@@ -57,10 +59,12 @@ function setupEventListeners() {
         }).catch(err => console.error('Failed to register player:', err));
 
         multiBtn.disabled = false;
-        multiBtn.click();
+        
+        // Start browsing for available rooms
+        startRoomBrowsing();
     });
 
-    // Main menu
+    // Main menu - Create new lobby
     document.getElementById('multiPlayerBtn').addEventListener('click', async () => {
         const username = document.getElementById('username').value.trim();
         if (!username) {
@@ -69,13 +73,15 @@ function setupEventListeners() {
         }
         currentUsername = username;
         
+        // Stop browsing before joining
+        stopRoomBrowsing();
+        
         // Initialize network
         if (!networkManager) {
             networkManager = new NetworkManager();
             try {
                 await networkManager.connect();
                 
-                // Generate room ID
                 const roomId = 'room-' + Math.random().toString(36).substring(2, 11);
                 const playerId = 'player-' + Math.random().toString(36).substring(2, 11);
                 
@@ -107,8 +113,19 @@ function setupEventListeners() {
     document.getElementById('leaveLobbyBtn').addEventListener('click', () => {
         if (networkManager) {
             networkManager.leaveRoom();
+            networkManager.disconnect();
+            networkManager = null;
         }
+        if (playerUpdateInterval) {
+            clearInterval(playerUpdateInterval);
+            playerUpdateInterval = null;
+        }
+        stopEnemySyncInterval();
+        currentHostId = null;
         showScreen('menu');
+        
+        // Resume room browsing
+        startRoomBrowsing();
     });
     
 }
@@ -209,6 +226,7 @@ function setupNetworkHandlers() {
 }
 
 function updateHostStatus(hostId) {
+    currentHostId = hostId;
     if (!game || !networkManager) return;
     const wasHost = game.isHost;
     game.isHost = (networkManager.playerId === hostId);
@@ -246,6 +264,88 @@ function stopEnemySyncInterval() {
     if (enemySyncInterval) {
         clearInterval(enemySyncInterval);
         enemySyncInterval = null;
+    }
+}
+
+async function startRoomBrowsing() {
+    stopRoomBrowsing();
+    
+    const browserEl = document.getElementById('roomBrowser');
+    if (browserEl) browserEl.style.display = 'block';
+    
+    browseManager = new NetworkManager();
+    try {
+        await browseManager.connect();
+        browseManager.onRoomList = (data) => {
+            renderRoomList(data.rooms || []);
+        };
+        browseManager.requestRoomList();
+    } catch (error) {
+        console.error('Failed to connect for room browsing:', error);
+        renderRoomList([]);
+    }
+}
+
+function stopRoomBrowsing() {
+    if (browseManager) {
+        browseManager.disconnect();
+        browseManager = null;
+    }
+    const browserEl = document.getElementById('roomBrowser');
+    if (browserEl) browserEl.style.display = 'none';
+}
+
+function renderRoomList(rooms) {
+    const listEl = document.getElementById('roomList');
+    if (!listEl) return;
+    
+    if (!rooms || rooms.length === 0) {
+        listEl.innerHTML = '<p class="room-list-empty">No lobbies available</p>';
+        return;
+    }
+    
+    listEl.innerHTML = '';
+    rooms.forEach(room => {
+        const item = document.createElement('div');
+        item.className = 'room-list-item';
+        item.innerHTML = `
+            <div class="room-info">
+                <div>${room.players.join(', ')}</div>
+                <div class="room-players">${room.playerCount}/${room.maxPlayers} players</div>
+            </div>
+            <span class="join-label">Join ▸</span>
+        `;
+        item.addEventListener('click', () => joinExistingRoom(room.roomId));
+        listEl.appendChild(item);
+    });
+}
+
+async function joinExistingRoom(roomId) {
+    if (!currentUsername) {
+        alert('Please enter your name first');
+        return;
+    }
+    
+    // Stop browsing before joining
+    stopRoomBrowsing();
+    
+    if (!networkManager) {
+        networkManager = new NetworkManager();
+        try {
+            await networkManager.connect();
+            
+            const playerId = 'player-' + Math.random().toString(36).substring(2, 11);
+            
+            networkManager.joinRoom(roomId, playerId, currentUsername);
+            
+            document.getElementById('roomCode').textContent = roomId;
+            
+            setupNetworkHandlers();
+            showScreen('lobby');
+        } catch (error) {
+            alert('Failed to connect to server.');
+            showScreen('menu');
+        }
     }
 }
 
@@ -355,6 +455,11 @@ function startGame(zoneName) {
     
     // Send updates to server
     if (networkManager) {
+        // Apply stored host status (room_update may have arrived before game was created)
+        if (currentHostId) {
+            updateHostStatus(currentHostId);
+        }
+        
         game.syncMultiplayerPlayers(currentRoomPlayers, networkManager.playerId);
         
         // Clear previous interval to prevent leaks
@@ -366,11 +471,6 @@ function startGame(zoneName) {
                 networkManager.sendPlayerUpdate(game.localPlayer.getState());
             }
         }, 50); // 20 updates per second
-        
-        // Start enemy sync if we are the host
-        if (game.isHost) {
-            startEnemySyncInterval();
-        }
     }
 }
 

@@ -258,3 +258,57 @@ body {
     border-radius: 5px;
 }
 
+.room-browser {
+    margin-top: 20px;
+}
+
+.room-browser h3 {
+    margin-bottom: 10px;
+    font-size: 18px;
+}
+
+.room-list {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 10px;
+    border-radius: 10px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.room-list-empty {
+    text-align: center;
+    opacity: 0.5;
+    padding: 10px;
+}
+
+.room-list-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    margin: 5px 0;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.room-list-item:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.room-list-item .room-info {
+    text-align: left;
+}
+
+.room-list-item .room-players {
+    font-size: 13px;
+    opacity: 0.8;
+}
+
+.room-list-item .join-label {
+    font-weight: bold;
+    font-size: 14px;
+    color: #f5576c;
+}
+
