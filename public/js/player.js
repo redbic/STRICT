@@ -9,7 +9,8 @@ const PLAYER_SIZE = 20;
 const PLAYER_STUN_FRICTION = 12;        // higher friction when stunned
 
 // Gun constants
-const PLAYER_GUN_FIRE_RATE = 1.5;       // shots per second
+const PLAYER_GUN_FIRE_RATE = 0.75;      // shots per second (slow, tactical)
+const PLAYER_GUN_DAMAGE = 34;           // damage per shot (3 shots kills 100hp enemy)
 const PLAYER_GUN_MAGAZINE_SIZE = 5;     // shots before reload
 const PLAYER_GUN_RELOAD_TIME = 1.5;     // seconds to reload
 const PLAYER_GUN_BARREL_LENGTH = 20;    // visual barrel offset
@@ -417,6 +418,7 @@ class Player {
         const spawnY = this.y + Math.sin(angle) * this.gun.barrelLength;
 
         return new Projectile(spawnX, spawnY, angle, this.id, {
+            damage: PLAYER_GUN_DAMAGE,
             maxBounces: 0  // Default weapon: no bounces
         });
     }

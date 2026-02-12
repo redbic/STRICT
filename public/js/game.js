@@ -89,10 +89,14 @@ class Game {
             this.keys = {};
         };
 
+        this.handleFocus = () => {
+            // Clear keys when regaining focus to prevent stuck keys
+            this.keys = {};
+        };
+
         this.handleVisibilityChange = () => {
-            if (document.hidden) {
-                this.keys = {};
-            }
+            // Clear keys whenever visibility changes (tab switch, minimize, etc.)
+            this.keys = {};
         };
 
         this.handleMouseMove = (e) => {
@@ -130,6 +134,7 @@ class Game {
         window.addEventListener('keydown', this.handleKeyDown);
         window.addEventListener('keyup', this.handleKeyUp);
         window.addEventListener('blur', this.handleBlur);
+        window.addEventListener('focus', this.handleFocus);
         document.addEventListener('visibilitychange', this.handleVisibilityChange);
         window.addEventListener('mousemove', this.handleMouseMove);
         window.addEventListener('mousedown', this.handleMouseDown);
@@ -718,6 +723,7 @@ class Game {
         window.removeEventListener('keydown', this.handleKeyDown);
         window.removeEventListener('keyup', this.handleKeyUp);
         window.removeEventListener('blur', this.handleBlur);
+        window.removeEventListener('focus', this.handleFocus);
         document.removeEventListener('visibilitychange', this.handleVisibilityChange);
         window.removeEventListener('mousemove', this.handleMouseMove);
         window.removeEventListener('mousedown', this.handleMouseDown);
