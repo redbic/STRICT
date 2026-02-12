@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - STRICT1000</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>%E2%9A%94%EF%B8%8F</text></svg>">
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .login-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+        }
+
+        .login-box {
+            background: rgba(26, 26, 46, 0.95);
+            border: 2px solid #e94560;
+            padding: 40px;
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 0 40px rgba(233, 69, 96, 0.3);
+        }
+
+        .login-title {
+            font-size: 2.5rem;
+            color: #e94560;
+            text-shadow: 0 0 30px #e94560;
+            margin-bottom: 10px;
+            letter-spacing: 4px;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+        }
+
+        .login-subtitle {
+            color: #888;
+            font-size: 1rem;
+            margin-bottom: 30px;
+        }
+
+        .login-input {
+            width: 100%;
+            background: #0f0f23;
+            border: 1px solid #e94560;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+            font-size: 1rem;
+            padding: 12px 16px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            box-sizing: border-box;
+        }
+
+        .login-input:focus {
+            outline: none;
+            box-shadow: 0 0 15px rgba(233, 69, 96, 0.5);
+        }
+
+        .login-btn {
+            width: 100%;
+            background: #e94560;
+            border: none;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+            font-size: 1rem;
+            font-weight: bold;
+            padding: 12px;
+            cursor: pointer;
+            letter-spacing: 2px;
+            transition: all 0.3s;
+        }
+
+        .login-btn:hover {
+            box-shadow: 0 0 20px rgba(233, 69, 96, 0.7);
+            transform: translateY(-2px);
+        }
+
+        .error-message {
+            color: #ff6b6b;
+            font-size: 0.9rem;
+            margin-top: 15px;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        @media (max-width: 480px) {
+            .login-box {
+                padding: 30px 20px;
+            }
+
+            .login-title {
+                font-size: 2rem;
+                letter-spacing: 2px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-box">
+            <div class="login-title">STRICT1000</div>
+            <div class="login-subtitle">Password Protected</div>
+
+            <form id="login-form">
+                <input
+                    type="password"
+                    class="login-input"
+                    id="password"
+                    placeholder="Enter password..."
+                    autocomplete="off"
+                    autofocus
+                >
+                <button type="submit" class="login-btn">ENTER</button>
+                <div class="error-message" id="error-message">Incorrect password</div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('login-form');
+        const passwordInput = document.getElementById('password');
+        const errorMessage = document.getElementById('error-message');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            errorMessage.classList.remove('show');
+
+            const password = passwordInput.value;
+
+            try {
+                const response = await fetch('/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ password }),
+                });
+
+                if (response.ok) {
+                    // Redirect to home page on success
+                    window.location.href = '/';
+                } else {
+                    // Show error message
+                    errorMessage.classList.add('show');
+                    passwordInput.value = '';
+                    passwordInput.focus();
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                errorMessage.textContent = 'Connection error';
+                errorMessage.classList.add('show');
+            }
+        });
+    </script>
+</body>
+</html>

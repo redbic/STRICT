@@ -4,8 +4,10 @@ const WebSocket = require('ws');
 const path = require('path');
 const { Pool } = require('pg');
 const rateLimit = require('express-rate-limit');
+const session = require('express-session');
 const currency = require('./server/currency');
 const { RoomManager, MAX_PARTY_SIZE } = require('./server/rooms');
+const { createAuthRouter, authMiddleware, isSessionAuthenticated } = require('./server/auth');
 const {
   normalizeSafeString,
   isValidRoomId,
@@ -20,16 +22,8 @@ require('dotenv').config();
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({
-  server,
+  noServer: true, // We handle upgrades manually for session auth
   maxPayload: 64 * 1024, // 64 KB max message size
-  verifyClient: ({ origin, req }, cb) => {
-    if (!origin) {
-      cb(true);
-      return;
-    }
-
-    cb(isAllowedWsOrigin(origin, req));
-  },
 });
 
 const PORT = process.env.PORT || 3000;
@@ -52,7 +46,6 @@ const WS_MESSAGE_TYPES = new Set([
 const HTTP_BODY_SIZE_LIMIT = '16kb';
 const WS_MAX_ENEMY_SYNC_COUNT = 64;
 const WS_MAX_CONNECTIONS_PER_IP = 5;
-const APP_AUTH_USERNAME = 'strict1000';
 
 // WebSocket rate limiting
 const WS_RATE_LIMIT_WINDOW_MS = 10000;
@@ -74,22 +67,34 @@ if (process.env.DATABASE_URL) {
 // Room manager
 const rooms = new RoomManager();
 
-// Middleware
-app.use((req, res, next) => {
-  if (req.path === '/health') {
-    return next();
-  }
+// Session store for WebSocket authentication
+const sessionStore = new Map();
 
-  if (isAuthorizedRequest(req.headers.authorization)) {
-    return next();
+// Session middleware
+const sessionMiddleware = session({
+  secret: process.env.SESSION_SECRET || 'strict1000-dev-secret-' + Math.random(),
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict'
   }
-
-  res.setHeader('WWW-Authenticate', 'Basic realm="STRICT1000", charset="UTF-8"');
-  return res.status(401).send('Authentication required.');
 });
 
-app.use(express.static(path.join(__dirname, 'public')));
+// Body parser for login (must come before auth routes)
 app.use(express.json({ limit: HTTP_BODY_SIZE_LIMIT }));
+
+// Session middleware
+app.use(sessionMiddleware);
+
+// Auth routes (login must be before auth middleware)
+app.use(createAuthRouter());
+app.use(authMiddleware);
+
+// Static files (after auth)
+app.use(express.static(path.join(__dirname, 'public')));
 app.use((_req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'no-referrer');
@@ -270,37 +275,19 @@ function isAllowedWsOrigin(origin, request) {
   }
 }
 
-function isAuthorizedRequest(authorizationHeader) {
-  const password = normalizeSafeString(process.env.APP_PASSWORD || '');
-  if (!password || !authorizationHeader || !authorizationHeader.startsWith('Basic ')) {
-    return false;
-  }
-
-  try {
-    const encodedCredentials = authorizationHeader.slice('Basic '.length);
-    const credentials = Buffer.from(encodedCredentials, 'base64').toString('utf8');
-    const separatorIndex = credentials.indexOf(':');
-    if (separatorIndex < 0) {
-      return false;
-    }
-
-    const username = credentials.slice(0, separatorIndex);
-    const providedPassword = credentials.slice(separatorIndex + 1);
-
-    return username === APP_AUTH_USERNAME && providedPassword === password;
-  } catch (_error) {
-    return false;
-  }
-}
-
 function validateEnvironment() {
   const nodeEnv = process.env.NODE_ENV || 'development';
   if (!normalizeSafeString(process.env.APP_PASSWORD || '')) {
     throw new Error('APP_PASSWORD is required to password protect STRICT1000');
   }
 
-  if (nodeEnv === 'production' && !process.env.DATABASE_URL) {
-    throw new Error('DATABASE_URL is required in production');
+  if (nodeEnv === 'production') {
+    if (!process.env.DATABASE_URL) {
+      throw new Error('DATABASE_URL is required in production');
+    }
+    if (!process.env.SESSION_SECRET) {
+      throw new Error('SESSION_SECRET is required in production');
+    }
   }
 }
 
@@ -350,7 +337,9 @@ function parseWsPayload(message) {
 }
 
 wss.on('connection', (ws, request) => {
-  if (!isAuthorizedRequest(request.headers.authorization)) {
+  // Check session-based authentication
+  // The session was already validated in the upgrade handler
+  if (!request.session || !isSessionAuthenticated(request.session)) {
     ws.close(1008, 'Unauthorized');
     return;
   }
@@ -668,6 +657,30 @@ setInterval(() => {
     }
   }
 }, WS_IP_CLEANUP_INTERVAL_MS);
+
+// Handle WebSocket upgrade with session authentication
+server.on('upgrade', (request, socket, head) => {
+  // Check origin
+  const origin = request.headers.origin;
+  if (origin && !isAllowedWsOrigin(origin, request)) {
+    socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+    socket.destroy();
+    return;
+  }
+
+  // Parse session from cookies
+  sessionMiddleware(request, {}, () => {
+    if (!request.session || !isSessionAuthenticated(request.session)) {
+      socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+      socket.destroy();
+      return;
+    }
+
+    wss.handleUpgrade(request, socket, head, (ws) => {
+      wss.emit('connection', ws, request);
+    });
+  });
+});
 
 // Start server
 server.listen(PORT, async () => {
