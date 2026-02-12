@@ -182,6 +182,8 @@ function setupNetworkHandlers() {
         if (game && data.zoneId && data.playerId === networkManager.playerId) {
             const zonePlayers = data.zonePlayers || [];
             game.transitionZone(data.zoneId, zonePlayers, networkManager.playerId);
+            // Update zone host status after zone change
+            updateZoneHostStatus();
         }
     };
 
@@ -193,6 +195,11 @@ function setupNetworkHandlers() {
         const playerInfo = currentRoomPlayers.find(p => p.id === data.playerId);
         if (playerInfo) {
             playerInfo.zone = data.zoneId;
+        }
+
+        // If the host changed zones, update zone host status
+        if (data.playerId === currentHostId) {
+            updateZoneHostStatus();
         }
 
         // If they left our zone, remove them from game.players
@@ -269,12 +276,41 @@ function updateHostStatus(hostId) {
     if (!game || !networkManager) return;
     const wasHost = game.isHost;
     game.isHost = (networkManager.playerId === hostId);
-    
+
     if (game.isHost && !wasHost) {
         // Start enemy sync interval when becoming host
         startEnemySyncInterval();
     } else if (!game.isHost && wasHost) {
         // Stop enemy sync interval when losing host status
+        stopEnemySyncInterval();
+    }
+
+    // Update zone host status
+    updateZoneHostStatus();
+}
+
+function updateZoneHostStatus() {
+    if (!game || !networkManager) return;
+
+    // If we're the main host, we're always the zone host
+    if (game.isHost) {
+        game.isZoneHost = false; // isHost takes precedence
+        return;
+    }
+
+    // Check if the main host is in our zone
+    const localZone = game.zoneId || 'hub';
+    const hostPlayer = currentRoomPlayers.find(p => p.id === currentHostId);
+    const hostZone = hostPlayer ? hostPlayer.zone : 'hub';
+
+    // We're zone host if the main host is in a different zone
+    const wasZoneHost = game.isZoneHost;
+    game.isZoneHost = (hostZone !== localZone);
+
+    // Start/stop enemy sync based on zone host status
+    if (game.isZoneHost && !wasZoneHost) {
+        startEnemySyncInterval();
+    } else if (!game.isZoneHost && wasZoneHost && !game.isHost) {
         stopEnemySyncInterval();
     }
 }

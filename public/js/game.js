@@ -30,6 +30,7 @@ class Game {
         this.lastMouse = { x: 0, y: 0 };
         this.onEnemyKilled = null; // Callback for when an enemy is killed
         this.isHost = false; // Whether this client is the host (authoritative for enemies)
+        this.isZoneHost = false; // Whether this client is authoritative for enemies in current zone
         this.onEnemyDamage = null; // Callback for sending enemy damage to host (non-host players)
         this.onPlayerDeath = null; // Callback for when the local player dies
 
@@ -260,8 +261,8 @@ class Game {
         // Update hit sparks
         this.updateHitSparks(dt);
 
-        // Only the host runs enemy AI; non-host clients receive synced state
-        if (this.isHost) {
+        // Only the host (or zone host) runs enemy AI; non-host clients receive synced state
+        if (this.isHost || this.isZoneHost) {
             // Find the nearest player for each enemy to chase (all players, not just local)
             this.enemies.forEach(enemy => {
                 const nearestPlayer = this.getNearestPlayer(enemy);
@@ -273,8 +274,8 @@ class Game {
         const newlyDead = this.enemies.filter(enemy => enemy.hp <= 0);
         this.enemies = this.enemies.filter(enemy => enemy.hp > 0);
 
-        // Notify about kills (only host reports kills to prevent double rewards)
-        if (this.isHost) {
+        // Notify about kills (only host or zone host reports kills to prevent double rewards)
+        if (this.isHost || this.isZoneHost) {
             newlyDead.forEach(enemy => {
                 if (this.onEnemyKilled) {
                     this.onEnemyKilled(enemy.id, this.zoneId || 'unknown');
@@ -428,8 +429,8 @@ class Game {
                         // Create hit spark effect
                         this.createHitSpark(proj.x, proj.y);
 
-                        if (this.isHost) {
-                            // Host applies damage directly
+                        if (this.isHost || this.isZoneHost) {
+                            // Host or zone host applies damage directly
                             enemy.takeDamage(proj.damage);
                         } else if (this.onEnemyDamage) {
                             // Non-host sends damage to host via network
