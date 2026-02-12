@@ -36,37 +36,36 @@ class Game {
             return event.key;
         };
 
-        window.addEventListener('keydown', (e) => {
+        // Store bound event handlers for cleanup
+        this.handleKeyDown = (e) => {
             const key = normalizeKey(e);
             this.keys[key] = true;
             if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(key)) {
                 e.preventDefault();
             }
-        });
+        };
         
-        window.addEventListener('keyup', (e) => {
+        this.handleKeyUp = (e) => {
             const key = normalizeKey(e);
             this.keys[key] = false;
-        });
+        };
 
-        // Clear all pressed keys when the window loses focus to prevent
-        // keys from getting "stuck" (e.g. when clicking while moving)
-        window.addEventListener('blur', () => {
+        this.handleBlur = () => {
             this.keys = {};
-        });
+        };
 
-        document.addEventListener('visibilitychange', () => {
+        this.handleVisibilityChange = () => {
             if (document.hidden) {
                 this.keys = {};
             }
-        });
+        };
 
-        window.addEventListener('mousemove', (e) => {
+        this.handleMouseMove = (e) => {
             this.lastMouse.x = e.clientX;
             this.lastMouse.y = e.clientY;
-        });
+        };
 
-        window.addEventListener('mousedown', (e) => {
+        this.handleMouseDown = (e) => {
             if (e.button === 2) {
                 e.preventDefault();
                 return;
@@ -87,15 +86,25 @@ class Game {
                 // Non-host sends damage to host via network
                 this.attackEnemiesRemote();
             }
-        });
+        };
 
-        window.addEventListener('resize', () => {
+        this.handleResize = () => {
             this.resizeCanvas();
-        });
+        };
 
-        this.canvas.addEventListener('contextmenu', (e) => {
+        this.handleContextMenu = (e) => {
             e.preventDefault();
-        });
+        };
+
+        // Attach event listeners
+        window.addEventListener('keydown', this.handleKeyDown);
+        window.addEventListener('keyup', this.handleKeyUp);
+        window.addEventListener('blur', this.handleBlur);
+        document.addEventListener('visibilitychange', this.handleVisibilityChange);
+        window.addEventListener('mousemove', this.handleMouseMove);
+        window.addEventListener('mousedown', this.handleMouseDown);
+        window.addEventListener('resize', this.handleResize);
+        this.canvas.addEventListener('contextmenu', this.handleContextMenu);
     }
 
     resizeCanvas() {
@@ -365,8 +374,13 @@ class Game {
     
     gameLoop() {
         if (this.running) {
-            this.update();
-            this.draw();
+            try {
+                this.update();
+                this.draw();
+            } catch (error) {
+                console.error('Game loop error:', error);
+                // Continue running to prevent total freeze
+            }
             requestAnimationFrame(() => this.gameLoop());
         }
     }
@@ -378,5 +392,20 @@ class Game {
     
     stop() {
         this.running = false;
+    }
+    
+    destroy() {
+        // Stop game loop
+        this.stop();
+        
+        // Remove all event listeners
+        window.removeEventListener('keydown', this.handleKeyDown);
+        window.removeEventListener('keyup', this.handleKeyUp);
+        window.removeEventListener('blur', this.handleBlur);
+        document.removeEventListener('visibilitychange', this.handleVisibilityChange);
+        window.removeEventListener('mousemove', this.handleMouseMove);
+        window.removeEventListener('mousedown', this.handleMouseDown);
+        window.removeEventListener('resize', this.handleResize);
+        this.canvas.removeEventListener('contextmenu', this.handleContextMenu);
     }
 }

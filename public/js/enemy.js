@@ -1,18 +1,28 @@
 // Enemy class for adventure combat
+
+// Constants
+const ENEMY_DEFAULT_SPEED = 1.8;  // Slower than player max speed (2.2) for tactical gameplay
+const ENEMY_DEFAULT_HP = 50;
+const ENEMY_DEFAULT_DAMAGE = 8;
+const ENEMY_ATTACK_RANGE = 28;
+const ENEMY_AGGRO_RANGE = 320;
+const ENEMY_ATTACK_COOLDOWN_FRAMES = 45;
+const ENEMY_SIZE = 22;
+
 class Enemy {
     constructor(x, y, id, options = {}) {
         this.x = x;
         this.y = y;
-        this.width = 22;
-        this.height = 22;
+        this.width = ENEMY_SIZE;
+        this.height = ENEMY_SIZE;
         this.id = id;
 
-        this.speed = options.speed !== undefined ? options.speed : 2.2;
-        this.hp = options.hp !== undefined ? options.hp : 50;
-        this.maxHp = options.maxHp !== undefined ? options.maxHp : 50;
-        this.damage = options.damage !== undefined ? options.damage : 8;
-        this.attackRange = 28;
-        this.aggroRange = 320;
+        this.speed = options.speed !== undefined ? options.speed : ENEMY_DEFAULT_SPEED;
+        this.hp = options.hp !== undefined ? options.hp : ENEMY_DEFAULT_HP;
+        this.maxHp = options.maxHp !== undefined ? options.maxHp : ENEMY_DEFAULT_HP;
+        this.damage = options.damage !== undefined ? options.damage : ENEMY_DEFAULT_DAMAGE;
+        this.attackRange = ENEMY_ATTACK_RANGE;
+        this.aggroRange = ENEMY_AGGRO_RANGE;
         this.attackCooldown = 0;
         this.stunned = false;
         this.stunnedTime = 0;
@@ -58,7 +68,7 @@ class Enemy {
                 }
             } else if (this.attackCooldown <= 0 && !this.passive) {
                 target.takeDamage(this.damage);
-                this.attackCooldown = 45;
+                this.attackCooldown = ENEMY_ATTACK_COOLDOWN_FRAMES;
             }
         }
 

@@ -474,12 +474,33 @@ function startGame(zoneName) {
         if (playerUpdateInterval) {
             clearInterval(playerUpdateInterval);
         }
+        
+        // Track last sent state to avoid redundant updates
+        let lastSentState = null;
+        
         playerUpdateInterval = setInterval(() => {
             if (game.localPlayer && game.running) {
-                networkManager.sendPlayerUpdate(game.localPlayer.getState());
+                const currentState = game.localPlayer.getState();
+                
+                // Only send if state has changed significantly
+                if (!lastSentState || hasSignificantChange(lastSentState, currentState)) {
+                    networkManager.sendPlayerUpdate(currentState);
+                    lastSentState = currentState;
+                }
             }
-        }, 50); // 20 updates per second
+        }, 100); // 10 updates per second (reduced from 20)
     }
+}
+
+// Helper function to check if player state has changed significantly
+function hasSignificantChange(oldState, newState) {
+    const positionThreshold = 2; // pixels
+    const dx = Math.abs(newState.x - oldState.x);
+    const dy = Math.abs(newState.y - oldState.y);
+    return dx > positionThreshold || 
+           dy > positionThreshold || 
+           oldState.stunned !== newState.stunned ||
+           oldState.angle !== newState.angle;
 }
 
 function recallToHub() {

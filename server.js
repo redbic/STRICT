@@ -225,6 +225,10 @@ function handleLeaveRoom(ws, data) {
       room.players = room.players.filter(p => p.id !== ws.playerId);
       
       if (room.players.length === 0) {
+        // Clear all respawn timers before deleting the room
+        if (room.respawnTimers) {
+          room.respawnTimers.forEach(timer => clearTimeout(timer));
+        }
         gameRooms.delete(ws.roomId);
       } else {
         // Reassign host if the leaving player was the host
@@ -364,6 +368,10 @@ async function handleEnemyKilled(ws, data) {
     
     // Schedule respawn
     const timerId = setTimeout(() => {
+      // Check if room still exists
+      const room = gameRooms.get(ws.roomId);
+      if (!room) return;
+      
       // Remove from killed enemies so it can be killed again
       room.killedEnemies.delete(enemyKey);
       
@@ -409,6 +417,12 @@ function handleEnemySync(ws, data) {
 function handleEnemyDamage(ws, data) {
   if (!ws.roomId || !data.enemyId || typeof data.damage !== 'number') return;
   
+  // Validate damage is within reasonable bounds (prevent cheating)
+  if (data.damage < 0 || data.damage > 100) {
+    console.warn(`Invalid damage amount from ${ws.playerId}: ${data.damage}`);
+    return;
+  }
+  
   const room = gameRooms.get(ws.roomId);
   if (!room || !room.hostId) return;
 
@@ -436,6 +450,10 @@ function handleDisconnect(ws) {
       room.players = room.players.filter(p => p.ws !== ws);
       
       if (room.players.length === 0) {
+        // Clear all respawn timers before deleting the room
+        if (room.respawnTimers) {
+          room.respawnTimers.forEach(timer => clearTimeout(timer));
+        }
         gameRooms.delete(ws.roomId);
       } else {
         // Reassign host if the disconnected player was the host
