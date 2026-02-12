@@ -25,6 +25,11 @@ class Game {
         this.isHost = false; // Whether this client is the host (authoritative for enemies)
         this.onEnemyDamage = null; // Callback for sending enemy damage to host (non-host players)
         
+        // Performance optimization: cache darkness overlay canvas
+        this.darknessCanvas = null;
+        this.lastVisibilityRadius = 0;
+        this.playerGlowCanvas = null; // Cache player glow effect
+        
         // Bind keyboard events
         const normalizeKey = (event) => {
             if (event.code === 'Space' || event.key === ' ' || event.key === 'Spacebar') {
@@ -372,6 +377,112 @@ class Game {
         });
 
         this.drawAttackFx();
+        
+        // Apply darkness overlay for The Gallery (ruleset: darkness)
+        if (this.zone && this.zone.ruleset === 'darkness' && this.localPlayer) {
+            this.drawDarknessOverlay();
+        }
+    }
+    
+    
+    createDarknessCanvas(radius) {
+        const canvas = document.createElement('canvas');
+        const size = radius * 2 + 100; // Add margin for gradient
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        
+        const center = size / 2;
+        const gradient = ctx.createRadialGradient(center, center, 0, center, center, radius);
+        gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+        gradient.addColorStop(0.7, 'rgba(0, 0, 0, 0.3)');
+        gradient.addColorStop(1, 'rgba(0, 0, 0, 0.95)');
+        
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, size, size);
+        
+        return canvas;
+    }
+    
+    createPlayerGlowCanvas() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 80;
+        canvas.height = 80;
+        const ctx = canvas.getContext('2d');
+        
+        const center = 40;
+        
+        // Draw glowing dot
+        ctx.fillStyle = 'rgba(100, 200, 255, 0.8)';
+        ctx.beginPath();
+        ctx.arc(center, center, 8, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Draw glow effect
+        const gradient = ctx.createRadialGradient(center, center, 0, center, center, 30);
+        gradient.addColorStop(0, 'rgba(100, 200, 255, 0.5)');
+        gradient.addColorStop(1, 'rgba(100, 200, 255, 0)');
+        
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(center, center, 30, 0, Math.PI * 2);
+        ctx.fill();
+        
+        return canvas;
+    }
+    
+    drawDarknessOverlay() {
+        if (!this.zone.visibilityRadius) return;
+        
+        // Create or update darkness canvas if visibility radius changed
+        if (!this.darknessCanvas || this.lastVisibilityRadius !== this.zone.visibilityRadius) {
+            this.darknessCanvas = this.createDarknessCanvas(this.zone.visibilityRadius);
+            this.lastVisibilityRadius = this.zone.visibilityRadius;
+        }
+        
+        // Create player glow canvas if not exists
+        if (!this.playerGlowCanvas) {
+            this.playerGlowCanvas = this.createPlayerGlowCanvas();
+        }
+        
+        const playerScreenX = this.localPlayer.x - this.cameraX;
+        const playerScreenY = this.localPlayer.y - this.cameraY;
+        
+        // Save context
+        this.ctx.save();
+        
+        // Draw darkness over everything
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.95)';
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        // Cut out the visibility circle using pre-rendered canvas
+        this.ctx.globalCompositeOperation = 'destination-out';
+        const halfSize = this.darknessCanvas.width / 2;
+        this.ctx.drawImage(
+            this.darknessCanvas,
+            playerScreenX - halfSize,
+            playerScreenY - halfSize
+        );
+        
+        // Restore context
+        this.ctx.globalCompositeOperation = 'source-over';
+        
+        // Draw glowing dots for other players using cached canvas
+        this.players.forEach(player => {
+            if (player.id === this.localPlayer.id) return; // Skip local player
+            
+            const otherScreenX = player.x - this.cameraX;
+            const otherScreenY = player.y - this.cameraY;
+            
+            // Draw pre-rendered player glow
+            this.ctx.drawImage(
+                this.playerGlowCanvas,
+                otherScreenX - 40,
+                otherScreenY - 40
+            );
+        });
+        
+        this.ctx.restore();
     }
 
     drawAttackFx() {
