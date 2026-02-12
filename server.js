@@ -114,11 +114,33 @@ app.post('/api/balance/add', async (req, res) => {
 // WebSocket game rooms
 const gameRooms = new Map();
 
+// Rate limiting constants for WebSocket
+const WS_RATE_LIMIT_WINDOW_MS = 10000; // 10 seconds
+const WS_RATE_LIMIT_MAX_MESSAGES = 100; // Max messages per window
+
 wss.on('connection', (ws) => {
   console.log('New WebSocket connection');
   
+  // Initialize rate limiting for this connection
+  ws.messageCount = 0;
+  ws.lastReset = Date.now();
+  
   ws.on('message', (message) => {
     try {
+      // Rate limiting check
+      const now = Date.now();
+      if (now - ws.lastReset > WS_RATE_LIMIT_WINDOW_MS) {
+        ws.messageCount = 0;
+        ws.lastReset = now;
+      }
+      
+      ws.messageCount++;
+      if (ws.messageCount > WS_RATE_LIMIT_MAX_MESSAGES) {
+        console.warn(`Rate limit exceeded for connection, closing`);
+        ws.close(1008, 'Rate limit exceeded');
+        return;
+      }
+      
       const data = JSON.parse(message);
       
       switch (data.type) {

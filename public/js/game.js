@@ -322,21 +322,38 @@ class Game {
     
     
     draw() {
-        // Clear canvas
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        // Note: No clearRect needed - zone draws full background
         
         // Draw zone
         if (this.zone) {
             this.zone.draw(this.ctx, this.cameraX, this.cameraY);
         }
         
-        // Draw players and enemies
+        // Draw players and enemies with visibility culling
         this.players.forEach(player => {
-            player.draw(this.ctx, this.cameraX, this.cameraY);
+            const playerRect = {
+                x: player.x - player.width/2,
+                y: player.y - player.height/2,
+                width: player.width,
+                height: player.height
+            };
+            if (!this.zone || this.zone.isVisible(playerRect, this.cameraX, this.cameraY, 
+                                                   this.canvas.width, this.canvas.height)) {
+                player.draw(this.ctx, this.cameraX, this.cameraY);
+            }
         });
 
         this.enemies.forEach(enemy => {
-            enemy.draw(this.ctx, this.cameraX, this.cameraY);
+            const enemyRect = {
+                x: enemy.x - enemy.width/2,
+                y: enemy.y - enemy.height/2,
+                width: enemy.width,
+                height: enemy.height
+            };
+            if (!this.zone || this.zone.isVisible(enemyRect, this.cameraX, this.cameraY,
+                                                   this.canvas.width, this.canvas.height)) {
+                enemy.draw(this.ctx, this.cameraX, this.cameraY);
+            }
         });
 
         // Draw NPCs

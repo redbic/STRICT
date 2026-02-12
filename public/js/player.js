@@ -11,6 +11,14 @@ const PLAYER_ATTACK_COOLDOWN_FRAMES = 25;
 const PLAYER_SIZE = 20;
 
 class Player {
+    /**
+     * Create a new player
+     * @param {number} x - Initial x position
+     * @param {number} y - Initial y position  
+     * @param {string} color - Hex color code for player
+     * @param {string} id - Unique player identifier
+     * @param {string} username - Display name for player
+     */
     constructor(x, y, color, id, username) {
         this.x = x;
         this.y = y;
@@ -48,6 +56,11 @@ class Player {
         this.stunnedTime = 0;
     }
     
+    /**
+     * Update player physics and state
+     * @param {Object} keys - Current keyboard state
+     * @param {Zone} zone - Current zone for collision detection
+     */
     update(keys, zone) {
         // Handle stun effect
         if (this.stunned) {
@@ -128,6 +141,12 @@ class Player {
         }
     }
     
+    /**
+     * Draw player on canvas
+     * @param {CanvasRenderingContext2D} ctx - Canvas context
+     * @param {number} cameraX - Camera x offset
+     * @param {number} cameraY - Camera y offset
+     */
     draw(ctx, cameraX, cameraY) {
         ctx.save();
         
@@ -178,14 +197,21 @@ class Player {
         ctx.fillText(this.username, screenX, labelY + 12);
         
     }
-
+    /**
+     * Set player avatar image
+     * @param {string} url - Avatar image URL
+     */
     setAvatar(url) {
         if (!url || this.avatarUrl === url) return;
         this.avatarUrl = url;
         this.avatarImg = new Image();
         this.avatarImg.src = url;
     }
-
+    /**
+     * Attempt to attack enemies in range
+     * @param {Array<Enemy>} enemies - Array of enemies to check
+     * @returns {boolean} True if an enemy was hit
+     */
     tryAttack(enemies) {
         if (this.attackCooldown > 0) return false;
         this.attackCooldown = PLAYER_ATTACK_COOLDOWN_FRAMES;
@@ -200,7 +226,10 @@ class Player {
         });
         return hit;
     }
-
+    /**
+     * Apply damage to player
+     * @param {number} amount - Damage amount
+     */
     takeDamage(amount) {
         this.hp = Math.max(0, this.hp - amount);
     }
