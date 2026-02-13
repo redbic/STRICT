@@ -10,12 +10,18 @@ class TilesetManager {
 
     async loadAll() {
         const tilesetFiles = {
+            // Room Builder
             floors: '/assets/tiles/Room_Builder_Floors_16x16.png',
             walls: '/assets/tiles/Room_Builder_Walls_16x16.png',
+            walls3d: '/assets/tiles/Room_Builder_3d_walls_16x16.png',
+            // Theme packs
             generic: '/assets/tiles/1_Generic_16x16.png',
-            t01_generic: '/assets/tiles/1_Generic_16x16.png',  // Alias for environment builder
+            t01_generic: '/assets/tiles/1_Generic_16x16.png',
+            t02_livingRoom: '/assets/tiles/2_LivingRoom_16x16.png',
             livingRoom: '/assets/tiles/2_LivingRoom_16x16.png',
+            t04_bedroom: '/assets/tiles/4_Bedroom_16x16.png',
             bedroom: '/assets/tiles/4_Bedroom_16x16.png',
+            t13_conference: '/assets/tiles/13_Conference_Hall_16x16.png',
             conference: '/assets/tiles/13_Conference_Hall_16x16.png'
         };
 
