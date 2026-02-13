@@ -82,16 +82,28 @@ class Game {
             // Debug: Press F3 to log player stats
             if (e.code === 'F3' && this.localPlayer) {
                 const p = this.localPlayer;
-                console.log('Player Debug:', {
-                    maxSpeed: p.maxSpeed,
-                    acceleration: p.acceleration,
-                    friction: p.friction,
-                    velocityX: p.velocityX,
-                    velocityY: p.velocityY,
-                    stunned: p.stunned,
+                console.log('=== F3 DEBUG ===');
+                console.log('Frame:', {
                     deltaTime: this.deltaTime,
-                    fps: Math.round(1 / this.deltaTime)
+                    fps: Math.round(1 / this.deltaTime),
+                    isHost: this.isHost,
+                    isZoneHost: this.isZoneHost
                 });
+                console.log('Player:', {
+                    id: p.id,
+                    maxSpeed: p.maxSpeed,
+                    velocityX: p.velocityX.toFixed(2),
+                    velocityY: p.velocityY.toFixed(2),
+                    speed: Math.hypot(p.velocityX, p.velocityY).toFixed(2)
+                });
+                console.log('Gun:', {
+                    ammo: p.gun.ammo,
+                    reloading: p.gun.reloading,
+                    reloadTimer: p.gun.reloadTimer.toFixed(2),
+                    fireCooldown: p.gun.fireCooldown.toFixed(2)
+                });
+                console.log('Players array:', this.players.length, 'players');
+                console.log('LocalPlayer in array:', this.players.includes(this.localPlayer));
                 e.preventDefault();
             }
             if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(key)) {
@@ -706,6 +718,13 @@ class Game {
             this.ctx.fillStyle = this.screenFlash.color;
             this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         }
+
+        // Draw FPS counter (top-left, small)
+        const fps = Math.round(1 / (this.deltaTime || 0.016));
+        this.ctx.fillStyle = fps < 30 ? '#ff4444' : '#44ff44';
+        this.ctx.font = '12px monospace';
+        this.ctx.textAlign = 'left';
+        this.ctx.fillText(`FPS: ${fps} | Host: ${this.isHost} | ZoneHost: ${this.isZoneHost}`, 10, 20);
     }
     
     
