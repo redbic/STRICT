@@ -1,5 +1,5 @@
 {
-  "name": "hotellobby",
+  "name": "hub",
   "width": 1008,
   "height": 720,
   "startX": 504,
@@ -2240,7 +2240,293 @@
   "objects": {
     "width": 21,
     "height": 15,
-    "tiles": []
+    "tiles": [
+      {
+        "x": 10,
+        "y": 6,
+        "tileset": "t01_generic",
+        "tileX": 1,
+        "tileY": 3,
+        "physical": true
+      },
+      {
+        "x": 9,
+        "y": 6,
+        "tileset": "t01_generic",
+        "tileX": 1,
+        "tileY": 3,
+        "physical": true
+      },
+      {
+        "x": 11,
+        "y": 6,
+        "tileset": "t01_generic",
+        "tileX": 1,
+        "tileY": 3,
+        "physical": true
+      },
+      {
+        "x": 8,
+        "y": 6,
+        "tileset": "t01_generic",
+        "tileX": 0,
+        "tileY": 3,
+        "physical": true
+      },
+      {
+        "x": 12,
+        "y": 6,
+        "tileset": "t01_generic",
+        "tileX": 2,
+        "tileY": 3,
+        "physical": true
+      },
+      {
+        "x": 8,
+        "y": 5,
+        "tileset": "t01_generic",
+        "tileX": 0,
+        "tileY": 2,
+        "physical": true
+      },
+      {
+        "x": 12,
+        "y": 5,
+        "tileset": "t01_generic",
+        "tileX": 2,
+        "tileY": 2,
+        "physical": true
+      },
+      {
+        "x": 12,
+        "y": 4,
+        "tileset": "t01_generic",
+        "tileX": 2,
+        "tileY": 1,
+        "physical": true
+      },
+      {
+        "x": 8,
+        "y": 4,
+        "tileset": "t01_generic",
+        "tileX": 0,
+        "tileY": 1,
+        "physical": true
+      },
+      {
+        "x": 9,
+        "y": 4,
+        "tileset": "t01_generic",
+        "tileX": 1,
+        "tileY": 1,
+        "physical": true
+      },
+      {
+        "x": 10,
+        "y": 4,
+        "tileset": "t01_generic",
+        "tileX": 1,
+        "tileY": 1,
+        "physical": true
+      },
+      {
+        "x": 11,
+        "y": 4,
+        "tileset": "t01_generic",
+        "tileX": 1,
+        "tileY": 1,
+        "physical": true
+      },
+      {
+        "x": 9,
+        "y": 5,
+        "tileset": "t01_generic",
+        "tileX": 11,
+        "tileY": 22
+      },
+      {
+        "x": 10,
+        "y": 5,
+        "tileset": "t01_generic",
+        "tileX": 11,
+        "tileY": 22
+      },
+      {
+        "x": 11,
+        "y": 5,
+        "tileset": "t01_generic",
+        "tileX": 11,
+        "tileY": 22
+      },
+      {
+        "x": 10,
+        "y": 8,
+        "tileset": "t01_generic",
+        "tileX": 3,
+        "tileY": 28
+      },
+      {
+        "x": 10,
+        "y": 9,
+        "tileset": "t01_generic",
+        "tileX": 3,
+        "tileY": 28
+      },
+      {
+        "x": 10,
+        "y": 10,
+        "tileset": "t01_generic",
+        "tileX": 3,
+        "tileY": 28
+      },
+      {
+        "x": 10,
+        "y": 11,
+        "tileset": "t01_generic",
+        "tileX": 3,
+        "tileY": 28
+      },
+      {
+        "x": 10,
+        "y": 12,
+        "tileset": "t01_generic",
+        "tileX": 3,
+        "tileY": 28
+      },
+      {
+        "x": 10,
+        "y": 13,
+        "tileset": "t01_generic",
+        "tileX": 3,
+        "tileY": 28
+      },
+      {
+        "x": 10,
+        "y": 14,
+        "tileset": "t01_generic",
+        "tileX": 3,
+        "tileY": 28
+      },
+      {
+        "x": 9,
+        "y": 14,
+        "tileset": "t01_generic",
+        "tileX": 4,
+        "tileY": 28
+      },
+      {
+        "x": 9,
+        "y": 13,
+        "tileset": "t01_generic",
+        "tileX": 4,
+        "tileY": 28
+      },
+      {
+        "x": 9,
+        "y": 12,
+        "tileset": "t01_generic",
+        "tileX": 4,
+        "tileY": 28
+      },
+      {
+        "x": 9,
+        "y": 11,
+        "tileset": "t01_generic",
+        "tileX": 4,
+        "tileY": 28
+      },
+      {
+        "x": 9,
+        "y": 10,
+        "tileset": "t01_generic",
+        "tileX": 4,
+        "tileY": 28
+      },
+      {
+        "x": 9,
+        "y": 9,
+        "tileset": "t01_generic",
+        "tileX": 4,
+        "tileY": 28
+      },
+      {
+        "x": 9,
+        "y": 8,
+        "tileset": "t01_generic",
+        "tileX": 4,
+        "tileY": 28
+      },
+      {
+        "x": 11,
+        "y": 8,
+        "tileset": "t01_generic",
+        "tileX": 5,
+        "tileY": 28
+      },
+      {
+        "x": 11,
+        "y": 9,
+        "tileset": "t01_generic",
+        "tileX": 5,
+        "tileY": 28
+      },
+      {
+        "x": 11,
+        "y": 10,
+        "tileset": "t01_generic",
+        "tileX": 5,
+        "tileY": 28
+      },
+      {
+        "x": 11,
+        "y": 11,
+        "tileset": "t01_generic",
+        "tileX": 5,
+        "tileY": 28
+      },
+      {
+        "x": 11,
+        "y": 12,
+        "tileset": "t01_generic",
+        "tileX": 5,
+        "tileY": 28
+      },
+      {
+        "x": 11,
+        "y": 13,
+        "tileset": "t01_generic",
+        "tileX": 5,
+        "tileY": 28
+      },
+      {
+        "x": 11,
+        "y": 14,
+        "tileset": "t01_generic",
+        "tileX": 5,
+        "tileY": 28
+      },
+      {
+        "x": 9,
+        "y": 7,
+        "tileset": "t01_generic",
+        "tileX": 6,
+        "tileY": 27
+      },
+      {
+        "x": 11,
+        "y": 7,
+        "tileset": "t01_generic",
+        "tileX": 7,
+        "tileY": 27
+      },
+      {
+        "x": 10,
+        "y": 7,
+        "tileset": "t01_generic",
+        "tileX": 8,
+        "tileY": 27
+      }
+    ]
   },
   "walls": [],
   "portals": [],
