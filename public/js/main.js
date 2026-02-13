@@ -1,6 +1,11 @@
 // Main application logic
-const USERNAME_PATTERN = /^[A-Za-z0-9]([A-Za-z0-9 _-]*[A-Za-z0-9])?$/;
-const MAX_USERNAME_LENGTH = 32;
+// Uses centralized CONFIG from config/constants.js
+const USERNAME_PATTERN = (typeof CONFIG !== 'undefined' && CONFIG.USERNAME_PATTERN)
+  ? CONFIG.USERNAME_PATTERN
+  : /^[A-Za-z0-9]([A-Za-z0-9 _-]*[A-Za-z0-9])?$/;
+const MAX_USERNAME_LENGTH = (typeof CONFIG !== 'undefined' && CONFIG.MAX_USERNAME_LENGTH)
+  ? CONFIG.MAX_USERNAME_LENGTH
+  : 32;
 
 let game = null;
 let networkManager = null;

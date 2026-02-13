@@ -2,7 +2,6 @@ const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
 const path = require('path');
-const { Pool } = require('pg');
 const rateLimit = require('express-rate-limit');
 const session = require('express-session');
 const currency = require('./server/currency');
@@ -17,6 +16,9 @@ const {
   isValidZoneId,
   sanitizeInventory,
 } = require('./server/validation');
+const { createPool } = require('./server/db/pool');
+const { broadcastToZone, safeSend } = require('./server/websocket/broadcast');
+const { getZoneHost, getMainHostZone } = require('./server/websocket/zone-host');
 require('dotenv').config();
 
 const app = express();
@@ -59,13 +61,7 @@ const WS_IP_CLEANUP_INTERVAL_MS = 60000; // Clean up stale IP entries every 60s
 validateEnvironment();
 
 // PostgreSQL connection pool
-let pool = null;
-if (process.env.DATABASE_URL) {
-  pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-  });
-}
+const pool = createPool(process.env.DATABASE_URL, process.env.NODE_ENV === 'production');
 
 // Room manager
 const rooms = new RoomManager();
@@ -227,21 +223,6 @@ async function ensurePlayerSchema() {
 }
 
 // --- WebSocket handlers ---
-
-/**
- * Safely send data to a WebSocket client with error handling
- * @param {WebSocket} ws - WebSocket connection
- * @param {object} data - Data to send (will be JSON stringified)
- */
-function safeSend(ws, data) {
-  if (ws.readyState === WebSocket.OPEN) {
-    try {
-      ws.send(JSON.stringify(data));
-    } catch (_) {
-      /* ignore send errors - connection may be closing */
-    }
-  }
-}
 
 function broadcastRoomList() {
   const available = rooms.getAvailableRooms();
@@ -477,18 +458,11 @@ function handlePlayerUpdate(ws, data) {
   const sender = room.players.find(p => p.id === ws.playerId);
   if (!sender) return;
 
-  // Pre-serialize once for all recipients
-  const payload = JSON.stringify({
+  broadcastToZone(room, sender.zone, {
     type: 'player_state',
     playerId: ws.playerId,
     state: data.state,
-  });
-
-  room.players.forEach(player => {
-    if (player.ws !== ws && player.ws.readyState === WebSocket.OPEN && player.zone === sender.zone) {
-      player.ws.send(payload);
-    }
-  });
+  }, ws);
 }
 
 function handleGameStart(ws) {
@@ -587,24 +561,15 @@ function handleEnemySync(ws, data) {
   const sender = room.players.find(p => p.id === ws.playerId);
   if (!sender) return;
 
-  const host = room.players.find(p => p.id === room.hostId);
-  const hostZone = host ? host.zone : null;
+  const hostZone = getMainHostZone(room);
 
   // Allow sync from main host, or from zone hosts (players in zones without the host)
   const isMainHost = ws.playerId === room.hostId;
-  const isZoneHost = sender.zone !== hostZone;
+  const isZoneHostPlayer = sender.zone !== hostZone;
 
-  if (!isMainHost && !isZoneHost) return;
+  if (!isMainHost && !isZoneHostPlayer) return;
 
-  // Sync to players in the sender's zone
-  const senderZone = sender.zone;
-  const payload = JSON.stringify({ type: 'enemy_sync', enemies: data.enemies });
-
-  room.players.forEach(player => {
-    if (player.ws !== ws && player.ws.readyState === WebSocket.OPEN && player.zone === senderZone) {
-      player.ws.send(payload);
-    }
-  });
+  broadcastToZone(room, sender.zone, { type: 'enemy_sync', enemies: data.enemies }, ws);
 }
 
 function handleEnemyDamage(ws, data) {
@@ -617,26 +582,8 @@ function handleEnemyDamage(ws, data) {
   const sender = room.players.find(p => p.id === ws.playerId);
   if (!sender) return;
 
-  const host = room.players.find(p => p.id === room.hostId);
-  const hostZone = host ? host.zone : null;
-
-  // If main host is in the same zone, route to them
-  if (host && sender.zone === hostZone) {
-    safeSend(host.ws, {
-      type: 'enemy_damage',
-      enemyId: data.enemyId,
-      damage: data.damage,
-      attackerId: ws.playerId,
-    });
-    return;
-  }
-
-  // Otherwise, find the zone host (smallest ID in sender's zone, excluding main host)
-  const playersInZone = room.players
-    .filter(p => p.zone === sender.zone && p.id !== room.hostId)
-    .sort((a, b) => a.id.localeCompare(b.id));
-
-  const zoneHost = playersInZone.length > 0 ? playersInZone[0] : null;
+  // Find the zone host for sender's zone
+  const zoneHost = getZoneHost(room, sender.zone);
 
   // Route damage to zone host (if they exist and aren't the sender)
   if (zoneHost && zoneHost.id !== ws.playerId) {
@@ -660,20 +607,13 @@ function handlePlayerFire(ws, data) {
   const sender = room.players.find(p => p.id === ws.playerId);
   if (!sender) return;
 
-  // Broadcast to players in same zone
-  const payload = JSON.stringify({
+  broadcastToZone(room, sender.zone, {
     type: 'player_fire',
     playerId: ws.playerId,
     x: data.x,
     y: data.y,
     angle: data.angle
-  });
-
-  room.players.forEach(player => {
-    if (player.ws !== ws && player.ws.readyState === WebSocket.OPEN && player.zone === sender.zone) {
-      player.ws.send(payload);
-    }
-  });
+  }, ws);
 }
 
 function handleDisconnect(ws) {

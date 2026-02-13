@@ -1,19 +1,20 @@
 // Player class for adventure character
+// Uses centralized CONFIG from config/constants.js
 
-// Constants (time-based, units per second)
-const PLAYER_MAX_SPEED = 350;           // pixels per second
-const PLAYER_ACCELERATION = 2200;       // pixels per second squared
-const PLAYER_FRICTION = 8;              // friction factor (higher = more friction)
-const PLAYER_DEFAULT_HP = 100;
-const PLAYER_SIZE = 30;                 // 50% larger (was 20)
-const PLAYER_STUN_FRICTION = 12;        // higher friction when stunned
+// Local aliases for frequently accessed config values
+const PLAYER_MAX_SPEED = typeof CONFIG !== 'undefined' ? CONFIG.PLAYER_MAX_SPEED : 350;
+const PLAYER_ACCELERATION = typeof CONFIG !== 'undefined' ? CONFIG.PLAYER_ACCELERATION : 2200;
+const PLAYER_FRICTION = typeof CONFIG !== 'undefined' ? CONFIG.PLAYER_FRICTION : 8;
+const PLAYER_DEFAULT_HP = typeof CONFIG !== 'undefined' ? CONFIG.PLAYER_DEFAULT_HP : 100;
+const PLAYER_SIZE = typeof CONFIG !== 'undefined' ? CONFIG.PLAYER_SIZE : 30;
+const PLAYER_STUN_FRICTION = typeof CONFIG !== 'undefined' ? CONFIG.PLAYER_STUN_FRICTION : 12;
 
-// Gun constants
-const PLAYER_GUN_FIRE_RATE = 0.75;      // shots per second (slow, tactical)
-const PLAYER_GUN_DAMAGE = 25;           // damage per shot (4 shots kills 100hp enemy)
-const PLAYER_GUN_MAGAZINE_SIZE = 5;     // shots before reload
-const PLAYER_GUN_RELOAD_TIME = 1.75;    // seconds to reload
-const PLAYER_GUN_BARREL_LENGTH = 20;    // visual barrel offset
+// Gun constants (aliased from CONFIG)
+const PLAYER_GUN_FIRE_RATE = typeof CONFIG !== 'undefined' ? CONFIG.GUN_FIRE_RATE : 0.75;
+const PLAYER_GUN_DAMAGE = typeof CONFIG !== 'undefined' ? CONFIG.GUN_DAMAGE : 25;
+const PLAYER_GUN_MAGAZINE_SIZE = typeof CONFIG !== 'undefined' ? CONFIG.GUN_MAGAZINE_SIZE : 5;
+const PLAYER_GUN_RELOAD_TIME = typeof CONFIG !== 'undefined' ? CONFIG.GUN_RELOAD_TIME : 1.75;
+const PLAYER_GUN_BARREL_LENGTH = typeof CONFIG !== 'undefined' ? CONFIG.GUN_BARREL_LENGTH : 20;
 
 class Player {
     /**

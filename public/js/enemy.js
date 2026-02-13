@@ -1,14 +1,15 @@
 // Enemy class for adventure combat
+// Uses centralized CONFIG from config/constants.js
 
-// Constants (time-based, units per second)
-const ENEMY_DEFAULT_SPEED = 108;  // pixels per second (was 1.8 * 60)
-const ENEMY_DEFAULT_HP = 50;
-const ENEMY_DEFAULT_DAMAGE = 8;
-const ENEMY_ATTACK_RANGE = 28;
-const ENEMY_AGGRO_RANGE = 320;
-const ENEMY_ATTACK_COOLDOWN = 0.75;  // seconds (was 45 frames / 60)
-const ENEMY_SIZE = 22;
-const ENEMY_STUN_DURATION = 0.3;     // seconds
+// Local aliases for frequently accessed config values
+const ENEMY_DEFAULT_SPEED = typeof CONFIG !== 'undefined' ? CONFIG.ENEMY_DEFAULT_SPEED : 108;
+const ENEMY_DEFAULT_HP = typeof CONFIG !== 'undefined' ? CONFIG.ENEMY_DEFAULT_HP : 50;
+const ENEMY_DEFAULT_DAMAGE = typeof CONFIG !== 'undefined' ? CONFIG.ENEMY_DEFAULT_DAMAGE : 8;
+const ENEMY_ATTACK_RANGE = typeof CONFIG !== 'undefined' ? CONFIG.ENEMY_ATTACK_RANGE : 28;
+const ENEMY_AGGRO_RANGE = typeof CONFIG !== 'undefined' ? CONFIG.ENEMY_AGGRO_RANGE : 320;
+const ENEMY_ATTACK_COOLDOWN = typeof CONFIG !== 'undefined' ? CONFIG.ENEMY_ATTACK_COOLDOWN : 0.75;
+const ENEMY_SIZE = typeof CONFIG !== 'undefined' ? CONFIG.ENEMY_SIZE : 22;
+const ENEMY_STUN_DURATION = typeof CONFIG !== 'undefined' ? CONFIG.ENEMY_STUN_DURATION : 0.3;
 
 class Enemy {
     /**
@@ -111,6 +112,7 @@ class Enemy {
     draw(ctx, cameraX, cameraY) {
         const screenX = this.x - cameraX;
         const screenY = this.y - cameraY;
+        const radius = this.width / 2;
 
         ctx.save();
 
@@ -119,55 +121,43 @@ class Enemy {
             const sprite = spriteManager.get('enemy');
             const size = this.width * 1.5;
             ctx.drawImage(sprite, screenX - size/2, screenY - size/2, size, size);
-        } else {
-            // Liminal style - uncanny, muted creature
-            const bodyColor = typeof COLORS !== 'undefined' ? COLORS.ENEMY_BODY : '#5c4a4a';
-            const eyeColor = typeof COLORS !== 'undefined' ? COLORS.ENEMY_EYES : '#2a2a2a';
+        } else if (typeof EntityRenderer !== 'undefined') {
+            // Use shared renderer utilities
+            const bodyColor = this.stunned ? '#8a8580' : EntityRenderer.getColor('ENEMY_BODY', '#5c4a4a');
+            const eyeColor = EntityRenderer.getColor('ENEMY_EYES', '#2a2a2a');
 
-            // Shadow beneath
-            ctx.fillStyle = 'rgba(40, 35, 25, 0.4)';
-            ctx.beginPath();
-            ctx.ellipse(screenX, screenY + this.width/2 + 4, this.width/2, 4, 0, 0, Math.PI * 2);
-            ctx.fill();
+            EntityRenderer.drawShadow(ctx, screenX, screenY, this.width);
+            EntityRenderer.drawBody(ctx, screenX, screenY, radius, bodyColor, false);
+            EntityRenderer.drawInnerShadow(ctx, screenX, screenY, radius);
 
-            // Body - muted, unsettling shape
-            ctx.fillStyle = this.stunned ? '#8a8580' : bodyColor;
-            ctx.beginPath();
-            ctx.arc(screenX, screenY, this.width / 2, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Subtle inner shadow
-            const gradient = ctx.createRadialGradient(screenX, screenY, 0, screenX, screenY, this.width/2);
-            gradient.addColorStop(0, 'rgba(0, 0, 0, 0.2)');
-            gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-            ctx.fillStyle = gradient;
-            ctx.beginPath();
-            ctx.arc(screenX, screenY, this.width / 2, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Subtle outline
+            // Outline with thicker stroke
             ctx.strokeStyle = 'rgba(80, 70, 55, 0.4)';
             ctx.lineWidth = 2;
             ctx.beginPath();
-            ctx.arc(screenX, screenY, this.width / 2, 0, Math.PI * 2);
+            ctx.arc(screenX, screenY, radius, 0, Math.PI * 2);
             ctx.stroke();
 
-            // Dark, empty eyes (unsettling)
-            ctx.fillStyle = eyeColor;
+            EntityRenderer.drawEyes(ctx, screenX, screenY - 2, 4, 2.5, eyeColor);
+        } else {
+            // Minimal fallback
+            ctx.fillStyle = this.stunned ? '#8a8580' : '#5c4a4a';
             ctx.beginPath();
-            ctx.arc(screenX - 4, screenY - 2, 2.5, 0, Math.PI * 2);
-            ctx.arc(screenX + 4, screenY - 2, 2.5, 0, Math.PI * 2);
+            ctx.arc(screenX, screenY, radius, 0, Math.PI * 2);
             ctx.fill();
         }
 
-        // HP bar (muted colors)
-        const barWidth = 36;
-        const barHeight = 5;
-        const hpRatio = this.hp / this.maxHp;
-        ctx.fillStyle = 'rgba(60, 50, 40, 0.7)';
-        ctx.fillRect(screenX - barWidth / 2, screenY - 24, barWidth, barHeight);
-        ctx.fillStyle = '#b04040';
-        ctx.fillRect(screenX - barWidth / 2, screenY - 24, barWidth * hpRatio, barHeight);
+        // HP bar using shared renderer
+        if (typeof EntityRenderer !== 'undefined') {
+            EntityRenderer.drawHealthBar(ctx, screenX, screenY - 24, this.hp, this.maxHp);
+        } else {
+            // Minimal fallback
+            const barWidth = 36;
+            const hpRatio = this.hp / this.maxHp;
+            ctx.fillStyle = 'rgba(60, 50, 40, 0.7)';
+            ctx.fillRect(screenX - barWidth / 2, screenY - 24, barWidth, 5);
+            ctx.fillStyle = '#b04040';
+            ctx.fillRect(screenX - barWidth / 2, screenY - 24, barWidth * hpRatio, 5);
+        }
 
         ctx.restore();
     }
