@@ -6,7 +6,8 @@ class Game {
         this.gameContainer = document.getElementById('game');
 
         // PixiJS renderer (WebGL)
-        this.usePixi = true; // Toggle for PixiJS rendering
+        // Temporarily disabled while debugging - set to true to enable
+        this.usePixi = false;
         this.pixiReady = false;
 
         this.resizeCanvas();
@@ -290,9 +291,15 @@ class Game {
         this.players.push(this.localPlayer);
         this.renderInventoryUI();
 
-        // Build PixiJS zone graphics
+        // Build PixiJS zone graphics (with error handling to ensure game starts)
         if (this.pixiReady && pixiRenderer) {
-            pixiRenderer.buildZone(this.zone);
+            try {
+                pixiRenderer.buildZone(this.zone);
+            } catch (err) {
+                console.error('PixiJS buildZone failed, falling back to Canvas 2D:', err);
+                this.usePixi = false;
+                this.pixiReady = false;
+            }
         }
 
         this.gameStarted = true;
@@ -767,12 +774,19 @@ class Game {
 
     // PixiJS WebGL rendering
     drawPixi() {
+        // Safety check - fall back to Canvas if PixiJS isn't ready
+        if (!this.pixiReady || !pixiRenderer) {
+            this.drawCanvas();
+            return;
+        }
+
         const frameDt = this.deltaTime || 1/60;
 
-        // Update camera
-        if (this.localPlayer) {
-            pixiRenderer.updateCamera(this.localPlayer.x, this.localPlayer.y);
-        }
+        try {
+            // Update camera
+            if (this.localPlayer) {
+                pixiRenderer.updateCamera(this.localPlayer.x, this.localPlayer.y);
+            }
 
         // Update player sprites
         this.players.forEach(player => {
@@ -826,6 +840,12 @@ class Game {
             pixiRenderer.triggerScreenFlash(0.3);
         }
         pixiRenderer.updateScreenFlash(frameDt);
+        } catch (err) {
+            console.error('PixiJS render error, falling back to Canvas 2D:', err);
+            this.usePixi = false;
+            this.pixiReady = false;
+            this.drawCanvas();
+        }
     }
 
     // Canvas 2D fallback rendering
