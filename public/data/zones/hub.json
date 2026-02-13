@@ -2525,6 +2525,46 @@
         "tileset": "t01_generic",
         "tileX": 8,
         "tileY": 27
+      },
+      {
+        "x": 8,
+        "y": 3,
+        "tileset": "t01_generic",
+        "tileX": 0,
+        "tileY": 0,
+        "physical": true
+      },
+      {
+        "x": 9,
+        "y": 3,
+        "tileset": "t01_generic",
+        "tileX": 1,
+        "tileY": 0,
+        "physical": true
+      },
+      {
+        "x": 10,
+        "y": 3,
+        "tileset": "t01_generic",
+        "tileX": 1,
+        "tileY": 0,
+        "physical": true
+      },
+      {
+        "x": 11,
+        "y": 3,
+        "tileset": "t01_generic",
+        "tileX": 1,
+        "tileY": 0,
+        "physical": true
+      },
+      {
+        "x": 12,
+        "y": 3,
+        "tileset": "t01_generic",
+        "tileX": 2,
+        "tileY": 0,
+        "physical": true
       }
     ]
   },
