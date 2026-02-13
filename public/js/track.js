@@ -17,11 +17,21 @@ class Zone {
         this.ruleset = zoneData.ruleset || 'standard';
         this.visibilityRadius = zoneData.visibilityRadius || null;
         this.isHub = zoneData.isHub || false;
-        
+
+        // Objects layer (furniture, decorations with optional collision)
+        this.objects = zoneData.objects || null;
+        this.objectsMap = null;
+        if (this.objects && this.objects.tiles) {
+            this.objectsMap = new Map();
+            this.objects.tiles.forEach(tile => {
+                this.objectsMap.set(`${tile.x},${tile.y}`, tile);
+            });
+        }
+
         // Performance optimization: cache time-based values
         this.lastClockUpdate = 0;
         this.cachedClockAngles = { hour: 0, minute: 0 };
-        
+
         // Performance optimization: pre-render chandelier glow
         this.chandelierCanvas = null;
         if (this.decorations && this.decorations.chandelier) {
@@ -163,6 +173,11 @@ class Zone {
             }
         });
 
+        // Draw objects layer (furniture, decorations)
+        if (this.objectsMap && typeof tilesetManager !== 'undefined' && tilesetManager && tilesetManager.loaded) {
+            this.drawObjects(ctx, cameraX, cameraY);
+        }
+
         // Draw pickup items with soft glow
         this.items.forEach(item => {
             if (!this.isVisible({ x: item.x - 12, y: item.y - 12, width: 24, height: 24 }, cameraX, cameraY, ctx.canvas.width, ctx.canvas.height)) {
@@ -268,6 +283,46 @@ class Zone {
     }
 
     /**
+     * Draw objects layer (furniture, decorations)
+     */
+    drawObjects(ctx, cameraX, cameraY) {
+        const scale = tilesetManager.scale;
+        const tileSize = tilesetManager.tileSize * scale; // 48px
+
+        const startTileX = Math.floor(cameraX / tileSize);
+        const startTileY = Math.floor(cameraY / tileSize);
+        const tilesX = Math.ceil(ctx.canvas.width / tileSize) + 2;
+        const tilesY = Math.ceil(ctx.canvas.height / tileSize) + 2;
+
+        ctx.imageSmoothingEnabled = false;
+
+        for (let ty = 0; ty < tilesY; ty++) {
+            for (let tx = 0; tx < tilesX; tx++) {
+                const worldTileX = startTileX + tx;
+                const worldTileY = startTileY + ty;
+
+                const tile = this.objectsMap.get(`${worldTileX},${worldTileY}`);
+                if (!tile) continue;
+
+                const screenX = worldTileX * tileSize - cameraX;
+                const screenY = worldTileY * tileSize - cameraY;
+
+                tilesetManager.drawTile(
+                    ctx,
+                    tile.tileset,
+                    tile.tileX,
+                    tile.tileY,
+                    screenX,
+                    screenY,
+                    scale,
+                    tile.flipH || false,
+                    tile.flipV || false
+                );
+            }
+        }
+    }
+
+    /**
      * Draw a liminal hotel-style door portal
      */
     drawNoirDoor(ctx, portal, cameraX, cameraY) {
@@ -362,6 +417,40 @@ class Zone {
                 return true;
             }
         }
+
+        // Check collision with physical objects
+        if (this.objectsMap) {
+            const tileSize = typeof tilesetManager !== 'undefined' ? tilesetManager.tileSize * tilesetManager.scale : 48;
+            const playerLeft = player.x - player.width / 2;
+            const playerRight = player.x + player.width / 2;
+            const playerTop = player.y - player.height / 2;
+            const playerBottom = player.y + player.height / 2;
+
+            // Check tiles the player overlaps
+            const minTileX = Math.floor(playerLeft / tileSize);
+            const maxTileX = Math.floor(playerRight / tileSize);
+            const minTileY = Math.floor(playerTop / tileSize);
+            const maxTileY = Math.floor(playerBottom / tileSize);
+
+            for (let ty = minTileY; ty <= maxTileY; ty++) {
+                for (let tx = minTileX; tx <= maxTileX; tx++) {
+                    const tile = this.objectsMap.get(`${tx},${ty}`);
+                    if (tile && tile.physical) {
+                        // AABB check with the tile
+                        const tileLeft = tx * tileSize;
+                        const tileRight = tileLeft + tileSize;
+                        const tileTop = ty * tileSize;
+                        const tileBottom = tileTop + tileSize;
+
+                        if (playerRight > tileLeft && playerLeft < tileRight &&
+                            playerBottom > tileTop && playerTop < tileBottom) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+
         return false;
     }
     

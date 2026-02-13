@@ -373,6 +373,8 @@
                 <span style="color:#444;margin:0 5px;">|</span>
                 <button class="tool-btn" id="flipHBtn" title="Flip Horizontal">FlipH</button>
                 <button class="tool-btn" id="flipVBtn" title="Flip Vertical">FlipV</button>
+                <span style="color:#444;margin:0 5px;">|</span>
+                <button class="tool-btn" id="physicalBtn" title="Object has collision (Objects layer only)">Physical</button>
             </div>
             <div class="wall-options" id="wallOptions">
                 <label>Wall Thickness: <input type="number" id="wallThickness" value="50" min="10" max="200"> px</label>
@@ -411,6 +413,9 @@
                 </label>
                 <label>
                     <input type="checkbox" id="includeFloor" checked> Include floor tiles
+                </label>
+                <label>
+                    <input type="checkbox" id="includeObjects" checked> Include objects
                 </label>
             </div>
             <div class="export-content">
@@ -480,6 +485,7 @@
         let isDrawing = false;
         let flipH = false;  // Horizontal flip
         let flipV = false;  // Vertical flip
+        let physical = false;  // Object has collision
 
         // Room data
         let roomData = {
@@ -544,6 +550,12 @@
                 flipV = !flipV;
                 e.target.classList.toggle('active', flipV);
                 updatePreview();
+                updateStatus();
+            });
+            // Physical toggle (for objects layer)
+            document.getElementById('physicalBtn').addEventListener('click', (e) => {
+                physical = !physical;
+                e.target.classList.toggle('active', physical);
                 updateStatus();
             });
 
@@ -745,6 +757,12 @@
             for (const [key, tile] of Object.entries(roomData.objects)) {
                 const [x, y] = key.split(',').map(Number);
                 drawTileAt(tile, x, y);
+                // Draw red border for physical objects
+                if (tile.physical) {
+                    ctx.strokeStyle = 'rgba(255, 80, 80, 0.8)';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(x * displayTileSize + 1, y * displayTileSize + 1, displayTileSize - 2, displayTileSize - 2);
+                }
             }
 
             // Draw walls
@@ -887,11 +905,15 @@
                 // Fill entire layer
                 for (let y = 0; y < roomHeight; y++) {
                     for (let x = 0; x < roomWidth; x++) {
-                        roomData[layer][`${x},${y}`] = { ...selectedTile, flipH, flipV };
+                        const tileData = { ...selectedTile, flipH, flipV };
+                        if (layer === 'objects') tileData.physical = physical;
+                        roomData[layer][`${x},${y}`] = tileData;
                     }
                 }
             } else if (selectedTile) {
-                roomData[layer][key] = { ...selectedTile, flipH, flipV };
+                const tileData = { ...selectedTile, flipH, flipV };
+                if (layer === 'objects') tileData.physical = physical;
+                roomData[layer][key] = tileData;
             }
 
             renderRoom();
@@ -909,6 +931,7 @@
             const zoneName = document.getElementById('zoneName').value || 'myZone';
             const includeWalls = document.getElementById('includeWalls').checked;
             const includeFloor = document.getElementById('includeFloor').checked;
+            const includeObjects = document.getElementById('includeObjects').checked;
 
             const worldWidth = roomWidth * TILE_SIZE * 3;  // 48px per tile at 3x scale
             const worldHeight = roomHeight * TILE_SIZE * 3;
@@ -928,6 +951,25 @@
                     let tileCode = `        { x: ${x}, y: ${y}, tileset: '${tile.tileset}', tileX: ${tile.tileX}, tileY: ${tile.tileY}`;
                     if (tile.flipH) tileCode += `, flipH: true`;
                     if (tile.flipV) tileCode += `, flipV: true`;
+                    tileCode += ` },\n`;
+                    code += tileCode;
+                }
+                code += `    ]\n};\n\n`;
+            }
+
+            // Objects (decorations/furniture)
+            if (includeObjects && Object.keys(roomData.objects).length > 0) {
+                code += `const ${zoneName.toUpperCase()}_OBJECTS = {\n`;
+                code += `    width: ${roomWidth},\n`;
+                code += `    height: ${roomHeight},\n`;
+                code += `    tiles: [\n`;
+
+                for (const [key, tile] of Object.entries(roomData.objects)) {
+                    const [x, y] = key.split(',');
+                    let tileCode = `        { x: ${x}, y: ${y}, tileset: '${tile.tileset}', tileX: ${tile.tileX}, tileY: ${tile.tileY}`;
+                    if (tile.flipH) tileCode += `, flipH: true`;
+                    if (tile.flipV) tileCode += `, flipV: true`;
+                    if (tile.physical) tileCode += `, physical: true`;
                     tileCode += ` },\n`;
                     code += tileCode;
                 }
@@ -954,6 +996,9 @@
             if (includeWalls && roomData.walls.length > 0) {
                 code += `    walls: ${zoneName.toUpperCase()}_WALLS,\n`;
             }
+            if (includeObjects && Object.keys(roomData.objects).length > 0) {
+                code += `    objects: ${zoneName.toUpperCase()}_OBJECTS,\n`;
+            }
             code += `    portals: [],\n`;
             code += `    npcs: []\n`;
             code += `}\n`;
@@ -972,8 +1017,9 @@
         function updateStatus() {
             const tileInfo = selectedTile ? `${selectedTile.tileset} (${selectedTile.tileX}, ${selectedTile.tileY})` : 'none';
             const flipInfo = (flipH || flipV) ? ` | Flip: ${flipH ? 'H' : ''}${flipV ? 'V' : ''}` : '';
+            const physInfo = (currentLayer === 'objects' && physical) ? ' | Physical' : '';
             document.getElementById('statusBar').textContent =
-                `Layer: ${currentLayer} | Tool: ${currentTool} | Selected: ${tileInfo}${flipInfo}`;
+                `Layer: ${currentLayer} | Tool: ${currentTool} | Selected: ${tileInfo}${flipInfo}${physInfo}`;
         }
 
         // Start
