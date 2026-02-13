@@ -401,8 +401,15 @@
                 </select>
             </label>
             <button onclick="resizeRoom()">Apply Size</button>
-            <button onclick="showLoadModal()">Load Room</button>
+            <select id="existingRooms" onchange="loadExistingRoom(this.value)">
+                <option value="">-- Load Existing --</option>
+                <option value="hub">Hub Lobby</option>
+                <option value="training">Training Room</option>
+                <option value="elevator">Elevator</option>
+            </select>
+            <button onclick="showLoadModal()">Import Code</button>
             <button class="danger" onclick="clearRoom()">Clear All</button>
+            <label style="margin-left:15px;"><input type="checkbox" id="autoWalls" checked> Auto Walls</label>
         </div>
     </div>
 
@@ -820,9 +827,32 @@ const MYZONE_FLOOR = {
             gridCanvas.width = canvas.width;
             gridCanvas.height = canvas.height;
 
+            // Auto-add boundary walls if enabled and walls are empty
+            const autoWalls = document.getElementById('autoWalls').checked;
+            if (autoWalls && roomData.walls.length === 0) {
+                addBoundaryWalls();
+            }
+
             renderRoom();
             renderGrid();
             updateExport();
+        }
+
+        function addBoundaryWalls() {
+            const worldWidth = roomWidth * TILE_SIZE * 3;  // 48px per tile
+            const worldHeight = roomHeight * TILE_SIZE * 3;
+            const wallThickness = 40;
+
+            roomData.walls = [
+                // Top wall
+                { x: 0, y: 0, width: worldWidth, height: wallThickness },
+                // Left wall
+                { x: 0, y: 0, width: wallThickness, height: worldHeight },
+                // Bottom wall
+                { x: 0, y: worldHeight - wallThickness, width: worldWidth, height: wallThickness },
+                // Right wall
+                { x: worldWidth - wallThickness, y: 0, width: wallThickness, height: worldHeight }
+            ];
         }
 
         function renderRoom() {
@@ -1267,6 +1297,180 @@ const MYZONE_FLOOR = {
                 hideLoadModal();
             }
         });
+
+        // Load existing room from predefined data
+        async function loadExistingRoom(roomId) {
+            if (!roomId) return;
+
+            // Reset dropdown
+            document.getElementById('existingRooms').value = '';
+
+            // Fetch room data from track.js definitions
+            const roomDefs = await fetchExistingRooms();
+            const room = roomDefs[roomId];
+
+            if (!room) {
+                alert('Room not found: ' + roomId);
+                return;
+            }
+
+            // Set room dimensions (convert from world units to tiles)
+            const tileWorldSize = 48; // 16px * 3 scale
+            roomWidth = Math.ceil(room.width / tileWorldSize);
+            roomHeight = Math.ceil(room.height / tileWorldSize);
+            document.getElementById('roomWidth').value = roomWidth;
+            document.getElementById('roomHeight').value = roomHeight;
+            document.getElementById('zoneName').value = roomId;
+
+            // Clear existing data
+            roomData = { floor: {}, walls: [], objects: {} };
+
+            // Load floor tiles
+            if (room.floorTiles) {
+                room.floorTiles.forEach(tile => {
+                    const key = `${tile.x},${tile.y}`;
+                    roomData.floor[key] = {
+                        tileset: tile.tileset,
+                        tileX: tile.tileX,
+                        tileY: tile.tileY,
+                        flipH: tile.flipH || false,
+                        flipV: tile.flipV || false
+                    };
+                });
+            }
+
+            // Load objects
+            if (room.objectTiles) {
+                room.objectTiles.forEach(tile => {
+                    const key = `${tile.x},${tile.y}`;
+                    roomData.objects[key] = {
+                        tileset: tile.tileset,
+                        tileX: tile.tileX,
+                        tileY: tile.tileY,
+                        flipH: tile.flipH || false,
+                        flipV: tile.flipV || false,
+                        physical: tile.physical || false
+                    };
+                });
+            }
+
+            // Load walls (convert from world coords)
+            if (room.walls) {
+                roomData.walls = room.walls.slice();
+            }
+
+            // Load all required tilesets
+            const usedTilesets = new Set();
+            Object.values(roomData.floor).forEach(t => usedTilesets.add(t.tileset));
+            Object.values(roomData.objects).forEach(t => usedTilesets.add(t.tileset));
+
+            await Promise.all([...usedTilesets].map(ts => {
+                if (!tilesetImages[ts] && TILESETS[ts]) {
+                    return loadTileset(ts);
+                }
+                return Promise.resolve();
+            }));
+
+            resizeRoom();
+            document.getElementById('statusBar').textContent = `Loaded room: ${room.name}`;
+            setTimeout(updateStatus, 2000);
+        }
+
+        // Fetch existing room definitions (embedded for now, could be from API)
+        async function fetchExistingRooms() {
+            // Hub lobby floor data (from track.js HUB_FLOOR)
+            const HUB_FLOOR_TILES = [
+                { x: 0, y: 14, tileset: 'floors', tileX: 8, tileY: 6, flipV: true },
+                { x: 0, y: 13, tileset: 'floors', tileX: 8, tileY: 7 },
+                { x: 0, y: 12, tileset: 'floors', tileX: 8, tileY: 7 },
+                { x: 0, y: 11, tileset: 'floors', tileX: 8, tileY: 7 },
+                { x: 0, y: 10, tileset: 'floors', tileX: 8, tileY: 7 },
+                { x: 0, y: 9, tileset: 'floors', tileX: 8, tileY: 7 },
+                { x: 0, y: 8, tileset: 'floors', tileX: 8, tileY: 7 },
+                { x: 0, y: 7, tileset: 'floors', tileX: 8, tileY: 7 },
+                { x: 0, y: 6, tileset: 'floors', tileX: 8, tileY: 7 },
+                { x: 0, y: 5, tileset: 'floors', tileX: 8, tileY: 7 },
+                { x: 0, y: 4, tileset: 'floors', tileX: 8, tileY: 7 },
+                { x: 0, y: 3, tileset: 'floors', tileX: 8, tileY: 7 },
+                { x: 0, y: 2, tileset: 'floors', tileX: 8, tileY: 7 },
+                { x: 0, y: 1, tileset: 'floors', tileX: 8, tileY: 7 },
+                { x: 0, y: 0, tileset: 'floors', tileX: 8, tileY: 6 },
+                { x: 19, y: 14, tileset: 'floors', tileX: 9, tileY: 6, flipV: true },
+                { x: 19, y: 0, tileset: 'floors', tileX: 9, tileY: 6 },
+                { x: 1, y: 0, tileset: 'floors', tileX: 9, tileY: 6 },
+                { x: 2, y: 0, tileset: 'floors', tileX: 9, tileY: 6 },
+                { x: 3, y: 0, tileset: 'floors', tileX: 9, tileY: 6 },
+                { x: 4, y: 0, tileset: 'floors', tileX: 9, tileY: 6 },
+                { x: 5, y: 0, tileset: 'floors', tileX: 9, tileY: 6 },
+                { x: 6, y: 0, tileset: 'floors', tileX: 9, tileY: 6 },
+                { x: 7, y: 0, tileset: 'floors', tileX: 9, tileY: 6 },
+                { x: 8, y: 0, tileset: 'floors', tileX: 9, tileY: 6 },
+                { x: 9, y: 0, tileset: 'floors', tileX: 9, tileY: 6 },
+                { x: 10, y: 0, tileset: 'floors', tileX: 9, tileY: 6 },
+                { x: 11, y: 0, tileset: 'floors', tileX: 9, tileY: 6 },
+                { x: 12, y: 0, tileset: 'floors', tileX: 9, tileY: 6 },
+                { x: 13, y: 0, tileset: 'floors', tileX: 9, tileY: 6 },
+                { x: 14, y: 0, tileset: 'floors', tileX: 9, tileY: 6 },
+                { x: 15, y: 0, tileset: 'floors', tileX: 9, tileY: 6 },
+                { x: 16, y: 0, tileset: 'floors', tileX: 9, tileY: 6 },
+                { x: 17, y: 0, tileset: 'floors', tileX: 9, tileY: 6 },
+                { x: 18, y: 0, tileset: 'floors', tileX: 9, tileY: 6 },
+                { x: 20, y: 0, tileset: 'floors', tileX: 8, tileY: 6, flipH: true },
+                { x: 20, y: 14, tileset: 'floors', tileX: 8, tileY: 6, flipH: true, flipV: true }
+            ];
+
+            // Fill in the rest of the hub floor (simplified - interior tiles)
+            for (let y = 1; y < 14; y++) {
+                for (let x = 1; x < 20; x++) {
+                    // Skip if already defined by border
+                    if (!HUB_FLOOR_TILES.find(t => t.x === x && t.y === y)) {
+                        HUB_FLOOR_TILES.push({ x, y, tileset: 'floors', tileX: 9, tileY: 7 });
+                    }
+                }
+                // Right border
+                HUB_FLOOR_TILES.push({ x: 20, y, tileset: 'floors', tileX: 8, tileY: 7, flipH: true });
+            }
+            // Bottom border
+            for (let x = 1; x < 20; x++) {
+                if (!HUB_FLOOR_TILES.find(t => t.x === x && t.y === 14)) {
+                    HUB_FLOOR_TILES.push({ x, y: 14, tileset: 'floors', tileX: 9, tileY: 6, flipV: true });
+                }
+            }
+
+            return {
+                hub: {
+                    name: 'Hub Lobby',
+                    width: 1008,
+                    height: 720,
+                    floorTiles: HUB_FLOOR_TILES,
+                    walls: []
+                },
+                training: {
+                    name: 'Training Room',
+                    width: 1000,
+                    height: 800,
+                    floorTiles: [],  // Uses default carpet
+                    walls: [
+                        { x: 0, y: 0, width: 1000, height: 40 },
+                        { x: 0, y: 0, width: 40, height: 800 },
+                        { x: 0, y: 760, width: 1000, height: 40 },
+                        { x: 960, y: 0, width: 40, height: 800 }
+                    ]
+                },
+                elevator: {
+                    name: 'Elevator',
+                    width: 400,
+                    height: 400,
+                    floorTiles: [],
+                    walls: [
+                        { x: 0, y: 0, width: 400, height: 40 },
+                        { x: 0, y: 0, width: 40, height: 400 },
+                        { x: 0, y: 360, width: 400, height: 40 },
+                        { x: 360, y: 0, width: 40, height: 400 }
+                    ]
+                }
+            };
+        }
 
         // Start
         init();
