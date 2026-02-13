@@ -107,16 +107,15 @@
             display: none;
         }
 
-        .selected-highlight {
+        .selection-overlay {
             position: absolute;
-            border: 3px solid #00ff88;
-            background: rgba(0, 255, 136, 0.3);
+            top: 0;
+            left: 0;
             pointer-events: none;
-            display: none;
         }
 
         .selection-panel {
-            width: 320px;
+            width: 380px;
             background: #2a2a4a;
             border-radius: 8px;
             padding: 20px;
@@ -128,51 +127,88 @@
             font-size: 18px;
         }
 
-        .preview-container {
+        .selection-header {
             display: flex;
-            align-items: flex-start;
-            gap: 20px;
-            margin-bottom: 20px;
-        }
-
-        .preview-box {
-            width: 96px;
-            height: 96px;
-            background: #1a1a2e;
-            border: 2px solid #444;
-            border-radius: 4px;
-            display: flex;
+            justify-content: space-between;
             align-items: center;
-            justify-content: center;
-            overflow: hidden;
+            margin-bottom: 15px;
         }
 
-        .preview-box canvas {
+        .selection-header h2 {
+            margin-bottom: 0;
+        }
+
+        .clear-selection-btn {
+            padding: 6px 12px;
+            background: #663333;
+            border: none;
+            border-radius: 3px;
+            color: #eee;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .clear-selection-btn:hover {
+            background: #884444;
+        }
+
+        .selected-tiles-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 15px;
+            max-height: 150px;
+            overflow-y: auto;
+            padding: 10px;
+            background: #1a1a2e;
+            border-radius: 4px;
+        }
+
+        .selected-tile-item {
+            width: 48px;
+            height: 48px;
+            background: #2a2a4a;
+            border: 2px solid #00ff88;
+            border-radius: 4px;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .selected-tile-item:hover {
+            border-color: #ff4444;
+        }
+
+        .selected-tile-item:hover::after {
+            content: '×';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 24px;
+            color: #ff4444;
+            text-shadow: 0 0 4px #000;
+        }
+
+        .selected-tile-item canvas {
             image-rendering: pixelated;
             image-rendering: crisp-edges;
+            width: 100%;
+            height: 100%;
         }
 
-        .preview-info {
-            flex: 1;
-        }
-
-        .info-row {
-            margin-bottom: 8px;
-        }
-
-        .info-label {
-            font-size: 12px;
-            color: #888;
-        }
-
-        .info-value {
-            font-size: 16px;
-            font-weight: 500;
+        .tile-number {
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            background: rgba(0,0,0,0.7);
             color: #fff;
+            font-size: 10px;
+            padding: 1px 4px;
+            border-radius: 2px;
         }
 
         .code-section {
-            margin-top: 20px;
+            margin-top: 15px;
         }
 
         .code-section h3 {
@@ -186,11 +222,15 @@
             border: 1px solid #444;
             border-radius: 4px;
             padding: 12px;
+            padding-right: 70px;
             font-family: 'Consolas', 'Monaco', monospace;
-            font-size: 13px;
+            font-size: 12px;
             color: #88ff88;
             word-break: break-all;
             position: relative;
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
         }
 
         .copy-btn {
@@ -233,59 +273,17 @@
             font-size: 14px;
         }
 
-        .history-section {
-            margin-top: 20px;
-            border-top: 1px solid #444;
-            padding-top: 15px;
-        }
-
-        .history-section h3 {
-            font-size: 14px;
-            color: #888;
-            margin-bottom: 10px;
-        }
-
-        .history-list {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-        }
-
-        .history-item {
-            width: 48px;
-            height: 48px;
-            background: #1a1a2e;
-            border: 2px solid #444;
-            border-radius: 4px;
-            cursor: pointer;
-            overflow: hidden;
-            transition: border-color 0.2s;
-        }
-
-        .history-item:hover {
-            border-color: #b5a589;
-        }
-
-        .history-item canvas {
-            image-rendering: pixelated;
-            image-rendering: crisp-edges;
-            width: 100%;
-            height: 100%;
-        }
-
-        .clear-history {
-            margin-top: 10px;
-            padding: 6px 12px;
-            background: #444;
-            border: none;
-            border-radius: 3px;
-            color: #eee;
+        .help-text {
             font-size: 12px;
-            cursor: pointer;
+            color: #666;
+            margin-top: 10px;
+            padding: 10px;
+            background: #1a1a2e;
+            border-radius: 4px;
         }
 
-        .clear-history:hover {
-            background: #666;
+        .format-select {
+            margin-bottom: 10px;
         }
     </style>
 </head>
@@ -321,21 +319,42 @@
             <div class="tileset-wrapper" id="tilesetWrapper">
                 <img class="tileset-image" id="tilesetImage" src="" alt="Tileset">
                 <canvas class="grid-overlay" id="gridOverlay"></canvas>
+                <canvas class="selection-overlay" id="selectionOverlay"></canvas>
                 <div class="hover-highlight" id="hoverHighlight"></div>
-                <div class="selected-highlight" id="selectedHighlight"></div>
             </div>
         </div>
 
         <div class="selection-panel">
-            <h2>Selected Tile</h2>
-            <div id="selectionContent">
-                <div class="no-selection">Click a tile to select it</div>
+            <div class="selection-header">
+                <h2>Selected Tiles (<span id="selectionCount">0</span>)</h2>
+                <button class="clear-selection-btn" id="clearSelection">Clear All</button>
             </div>
 
-            <div class="history-section">
-                <h3>Recent Selections</h3>
-                <div class="history-list" id="historyList"></div>
-                <button class="clear-history" id="clearHistory">Clear History</button>
+            <div class="selected-tiles-grid" id="selectedTilesGrid">
+                <div class="no-selection">Click tiles to select. Click again to deselect.</div>
+            </div>
+
+            <div class="code-section">
+                <div class="format-select">
+                    <label for="formatSelect">Format:</label>
+                    <select id="formatSelect">
+                        <option value="array">Array of objects</option>
+                        <option value="const">Named constants</option>
+                        <option value="compact">Compact array</option>
+                    </select>
+                </div>
+                <h3>Code Output</h3>
+                <div class="code-box" id="codeBox">
+                    <code id="codeSnippet">// Select tiles to generate code</code>
+                    <button class="copy-btn" id="copyBtn">Copy</button>
+                </div>
+            </div>
+
+            <div class="help-text">
+                <strong>Tips:</strong><br>
+                • Click to select/deselect tiles<br>
+                • Click selected tiles in the grid to remove them<br>
+                • Tiles are numbered in selection order
             </div>
         </div>
     </div>
@@ -356,22 +375,26 @@
         let currentTileset = 'floors';
         let currentScale = 3;
         let currentImage = null;
-        let selectedTile = null;
-        let history = [];
+        let selectedTiles = []; // Array of selected tiles
+        let tilesetImages = {}; // Cache loaded images
 
         const elements = {
             tilesetSelect: document.getElementById('tilesetSelect'),
             scaleSelect: document.getElementById('scaleSelect'),
+            formatSelect: document.getElementById('formatSelect'),
             tilesetImage: document.getElementById('tilesetImage'),
             tilesetWrapper: document.getElementById('tilesetWrapper'),
             gridOverlay: document.getElementById('gridOverlay'),
+            selectionOverlay: document.getElementById('selectionOverlay'),
             hoverHighlight: document.getElementById('hoverHighlight'),
-            selectedHighlight: document.getElementById('selectedHighlight'),
             tilesetInfo: document.getElementById('tilesetInfo'),
-            selectionContent: document.getElementById('selectionContent'),
-            coordsDisplay: document.getElementById('coordsDisplay'),
-            historyList: document.getElementById('historyList'),
-            clearHistory: document.getElementById('clearHistory')
+            selectedTilesGrid: document.getElementById('selectedTilesGrid'),
+            selectionCount: document.getElementById('selectionCount'),
+            codeSnippet: document.getElementById('codeSnippet'),
+            codeBox: document.getElementById('codeBox'),
+            copyBtn: document.getElementById('copyBtn'),
+            clearSelection: document.getElementById('clearSelection'),
+            coordsDisplay: document.getElementById('coordsDisplay')
         };
 
         function loadTileset(tilesetKey) {
@@ -385,6 +408,7 @@
             const img = new Image();
             img.onload = () => {
                 currentImage = img;
+                tilesetImages[tilesetKey] = img;
                 const scaledWidth = img.width * currentScale;
                 const scaledHeight = img.height * currentScale;
 
@@ -399,7 +423,7 @@
                     `${tileset.name} - ${img.width}x${img.height}px (${tilesX}x${tilesY} tiles)`;
 
                 drawGrid(scaledWidth, scaledHeight);
-                updateSelectedHighlight();
+                drawSelectionOverlay();
             };
             img.onerror = () => {
                 elements.tilesetInfo.textContent = 'Failed to load tileset';
@@ -418,7 +442,6 @@
 
             const scaledTileSize = TILE_SIZE * currentScale;
 
-            // Vertical lines
             for (let x = 0; x <= width; x += scaledTileSize) {
                 ctx.beginPath();
                 ctx.moveTo(x + 0.5, 0);
@@ -426,13 +449,49 @@
                 ctx.stroke();
             }
 
-            // Horizontal lines
             for (let y = 0; y <= height; y += scaledTileSize) {
                 ctx.beginPath();
                 ctx.moveTo(0, y + 0.5);
                 ctx.lineTo(width, y + 0.5);
                 ctx.stroke();
             }
+        }
+
+        function drawSelectionOverlay() {
+            if (!currentImage) return;
+
+            const scaledWidth = currentImage.width * currentScale;
+            const scaledHeight = currentImage.height * currentScale;
+            const canvas = elements.selectionOverlay;
+            canvas.width = scaledWidth;
+            canvas.height = scaledHeight;
+            const ctx = canvas.getContext('2d');
+
+            ctx.clearRect(0, 0, scaledWidth, scaledHeight);
+
+            const scaledTileSize = TILE_SIZE * currentScale;
+
+            selectedTiles.forEach((tile, index) => {
+                if (tile.tileset !== currentTileset) return;
+
+                const x = tile.tileX * scaledTileSize;
+                const y = tile.tileY * scaledTileSize;
+
+                // Draw selection highlight
+                ctx.fillStyle = 'rgba(0, 255, 136, 0.3)';
+                ctx.fillRect(x, y, scaledTileSize, scaledTileSize);
+
+                ctx.strokeStyle = '#00ff88';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(x + 1, y + 1, scaledTileSize - 2, scaledTileSize - 2);
+
+                // Draw number
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                ctx.fillRect(x + 2, y + 2, 16, 14);
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 10px monospace';
+                ctx.fillText((index + 1).toString(), x + 4, y + 12);
+            });
         }
 
         function getTileCoords(event) {
@@ -460,144 +519,131 @@
             elements.coordsDisplay.textContent = `tileX: ${coords.tileX}, tileY: ${coords.tileY}`;
         }
 
-        function updateSelectedHighlight() {
-            if (!selectedTile || selectedTile.tileset !== currentTileset) {
-                elements.selectedHighlight.style.display = 'none';
-                return;
+        function toggleTile(coords) {
+            const existingIndex = selectedTiles.findIndex(t =>
+                t.tileset === currentTileset &&
+                t.tileX === coords.tileX &&
+                t.tileY === coords.tileY
+            );
+
+            if (existingIndex !== -1) {
+                // Deselect
+                selectedTiles.splice(existingIndex, 1);
+            } else {
+                // Select
+                selectedTiles.push({
+                    tileset: currentTileset,
+                    tileX: coords.tileX,
+                    tileY: coords.tileY
+                });
             }
 
-            const scaledTileSize = TILE_SIZE * currentScale;
-            elements.selectedHighlight.style.display = 'block';
-            elements.selectedHighlight.style.left = (selectedTile.tileX * scaledTileSize) + 'px';
-            elements.selectedHighlight.style.top = (selectedTile.tileY * scaledTileSize) + 'px';
-            elements.selectedHighlight.style.width = scaledTileSize + 'px';
-            elements.selectedHighlight.style.height = scaledTileSize + 'px';
+            drawSelectionOverlay();
+            updateSelectionPanel();
+            updateCodeOutput();
         }
 
-        function selectTile(coords) {
-            selectedTile = {
-                tileset: currentTileset,
-                tileX: coords.tileX,
-                tileY: coords.tileY
-            };
-
-            // Add to history (avoid duplicates)
-            const existingIndex = history.findIndex(h =>
-                h.tileset === selectedTile.tileset &&
-                h.tileX === selectedTile.tileX &&
-                h.tileY === selectedTile.tileY
-            );
-            if (existingIndex !== -1) {
-                history.splice(existingIndex, 1);
-            }
-            history.unshift({ ...selectedTile });
-            if (history.length > 12) history.pop();
-
-            updateSelectedHighlight();
+        function removeTile(index) {
+            selectedTiles.splice(index, 1);
+            drawSelectionOverlay();
             updateSelectionPanel();
-            updateHistoryPanel();
+            updateCodeOutput();
         }
 
         function updateSelectionPanel() {
-            if (!selectedTile || !currentImage) {
-                elements.selectionContent.innerHTML = '<div class="no-selection">Click a tile to select it</div>';
+            elements.selectionCount.textContent = selectedTiles.length;
+
+            if (selectedTiles.length === 0) {
+                elements.selectedTilesGrid.innerHTML = '<div class="no-selection">Click tiles to select. Click again to deselect.</div>';
                 return;
             }
 
-            const previewCanvas = document.createElement('canvas');
-            previewCanvas.width = 64;
-            previewCanvas.height = 64;
-            const ctx = previewCanvas.getContext('2d');
-            ctx.imageSmoothingEnabled = false;
+            elements.selectedTilesGrid.innerHTML = '';
 
-            ctx.drawImage(
-                currentImage,
-                selectedTile.tileX * TILE_SIZE,
-                selectedTile.tileY * TILE_SIZE,
-                TILE_SIZE, TILE_SIZE,
-                0, 0, 64, 64
-            );
-
-            const codeSnippet = `{ tileset: '${selectedTile.tileset}', tileX: ${selectedTile.tileX}, tileY: ${selectedTile.tileY} }`;
-
-            elements.selectionContent.innerHTML = `
-                <div class="preview-container">
-                    <div class="preview-box" id="previewBox"></div>
-                    <div class="preview-info">
-                        <div class="info-row">
-                            <div class="info-label">Tileset</div>
-                            <div class="info-value">${selectedTile.tileset}</div>
-                        </div>
-                        <div class="info-row">
-                            <div class="info-label">Position</div>
-                            <div class="info-value">X: ${selectedTile.tileX}, Y: ${selectedTile.tileY}</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="code-section">
-                    <h3>Code Snippet</h3>
-                    <div class="code-box">
-                        <code id="codeSnippet">${codeSnippet}</code>
-                        <button class="copy-btn" id="copyBtn">Copy</button>
-                    </div>
-                </div>
-            `;
-
-            document.getElementById('previewBox').appendChild(previewCanvas);
-
-            document.getElementById('copyBtn').addEventListener('click', () => {
-                navigator.clipboard.writeText(codeSnippet).then(() => {
-                    const btn = document.getElementById('copyBtn');
-                    btn.textContent = 'Copied!';
-                    btn.classList.add('copied');
-                    setTimeout(() => {
-                        btn.textContent = 'Copy';
-                        btn.classList.remove('copied');
-                    }, 1500);
-                });
-            });
-        }
-
-        function updateHistoryPanel() {
-            elements.historyList.innerHTML = '';
-
-            history.forEach((item, index) => {
+            selectedTiles.forEach((tile, index) => {
                 const div = document.createElement('div');
-                div.className = 'history-item';
-                div.title = `${item.tileset} (${item.tileX}, ${item.tileY})`;
+                div.className = 'selected-tile-item';
+                div.title = `${tile.tileset} (${tile.tileX}, ${tile.tileY}) - Click to remove`;
 
                 const canvas = document.createElement('canvas');
                 canvas.width = TILE_SIZE;
                 canvas.height = TILE_SIZE;
 
-                // Load the tileset image for this history item
-                const img = new Image();
-                img.onload = () => {
-                    const ctx = canvas.getContext('2d');
-                    ctx.imageSmoothingEnabled = false;
-                    ctx.drawImage(
-                        img,
-                        item.tileX * TILE_SIZE,
-                        item.tileY * TILE_SIZE,
-                        TILE_SIZE, TILE_SIZE,
-                        0, 0, TILE_SIZE, TILE_SIZE
-                    );
+                // Load and draw the tile
+                const loadAndDraw = () => {
+                    const img = tilesetImages[tile.tileset];
+                    if (img) {
+                        const ctx = canvas.getContext('2d');
+                        ctx.imageSmoothingEnabled = false;
+                        ctx.drawImage(
+                            img,
+                            tile.tileX * TILE_SIZE,
+                            tile.tileY * TILE_SIZE,
+                            TILE_SIZE, TILE_SIZE,
+                            0, 0, TILE_SIZE, TILE_SIZE
+                        );
+                    }
                 };
-                img.src = TILESETS[item.tileset].path;
+
+                if (tilesetImages[tile.tileset]) {
+                    loadAndDraw();
+                } else {
+                    const img = new Image();
+                    img.onload = () => {
+                        tilesetImages[tile.tileset] = img;
+                        loadAndDraw();
+                    };
+                    img.src = TILESETS[tile.tileset].path;
+                }
+
+                const number = document.createElement('div');
+                number.className = 'tile-number';
+                number.textContent = (index + 1).toString();
 
                 div.appendChild(canvas);
-                div.addEventListener('click', () => {
-                    if (item.tileset !== currentTileset) {
-                        elements.tilesetSelect.value = item.tileset;
-                        loadTileset(item.tileset);
-                    }
-                    selectedTile = { ...item };
-                    updateSelectedHighlight();
-                    updateSelectionPanel();
-                });
+                div.appendChild(number);
+                div.addEventListener('click', () => removeTile(index));
 
-                elements.historyList.appendChild(div);
+                elements.selectedTilesGrid.appendChild(div);
             });
+        }
+
+        function updateCodeOutput() {
+            if (selectedTiles.length === 0) {
+                elements.codeSnippet.textContent = '// Select tiles to generate code';
+                return;
+            }
+
+            const format = elements.formatSelect.value;
+            let code = '';
+
+            switch (format) {
+                case 'array':
+                    code = 'const TILES = [\n';
+                    selectedTiles.forEach((tile, i) => {
+                        code += `    { tileset: '${tile.tileset}', tileX: ${tile.tileX}, tileY: ${tile.tileY} }`;
+                        code += i < selectedTiles.length - 1 ? ',\n' : '\n';
+                    });
+                    code += '];';
+                    break;
+
+                case 'const':
+                    selectedTiles.forEach((tile, i) => {
+                        code += `const TILE_${i + 1} = { tileset: '${tile.tileset}', tileX: ${tile.tileX}, tileY: ${tile.tileY} };\n`;
+                    });
+                    break;
+
+                case 'compact':
+                    code = '[';
+                    selectedTiles.forEach((tile, i) => {
+                        code += `['${tile.tileset}',${tile.tileX},${tile.tileY}]`;
+                        code += i < selectedTiles.length - 1 ? ',' : '';
+                    });
+                    code += ']';
+                    break;
+            }
+
+            elements.codeSnippet.textContent = code;
         }
 
         // Event listeners
@@ -608,6 +654,10 @@
         elements.scaleSelect.addEventListener('change', (e) => {
             currentScale = parseInt(e.target.value);
             loadTileset(currentTileset);
+        });
+
+        elements.formatSelect.addEventListener('change', () => {
+            updateCodeOutput();
         });
 
         elements.tilesetWrapper.addEventListener('mousemove', (e) => {
@@ -622,12 +672,26 @@
 
         elements.tilesetWrapper.addEventListener('click', (e) => {
             const coords = getTileCoords(e);
-            selectTile(coords);
+            toggleTile(coords);
         });
 
-        elements.clearHistory.addEventListener('click', () => {
-            history = [];
-            updateHistoryPanel();
+        elements.clearSelection.addEventListener('click', () => {
+            selectedTiles = [];
+            drawSelectionOverlay();
+            updateSelectionPanel();
+            updateCodeOutput();
+        });
+
+        elements.copyBtn.addEventListener('click', () => {
+            const code = elements.codeSnippet.textContent;
+            navigator.clipboard.writeText(code).then(() => {
+                elements.copyBtn.textContent = 'Copied!';
+                elements.copyBtn.classList.add('copied');
+                setTimeout(() => {
+                    elements.copyBtn.textContent = 'Copy';
+                    elements.copyBtn.classList.remove('copied');
+                }, 1500);
+            });
         });
 
         // Initialize
