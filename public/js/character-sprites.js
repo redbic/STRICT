@@ -9,17 +9,18 @@ class CharacterSpriteManager {
         this.loaded = false;
 
         // Animation definitions based on LimeZu premade character sprite sheet layout
-        // Row order: down, left, right, up (LimeZu standard)
-        // Each row is 32px tall, 6 frames per animation
+        // Row 1 = idle, Row 2 = walk (using 0-indexed rows)
+        // Directions are horizontal within each row:
+        //   Frames 0-5: Right, Frames 6-11: Up, Frames 12-17: Left, Frames 18-23: Down
         this.animations = {
-            idle_down:  { row: 0, frames: 6, speed: 0.15 },
-            idle_left:  { row: 1, frames: 6, speed: 0.15 },
-            idle_right: { row: 2, frames: 6, speed: 0.15 },
-            idle_up:    { row: 3, frames: 6, speed: 0.15 },
-            walk_down:  { row: 4, frames: 6, speed: 0.1 },
-            walk_left:  { row: 5, frames: 6, speed: 0.1 },
-            walk_right: { row: 6, frames: 6, speed: 0.1 },
-            walk_up:    { row: 7, frames: 6, speed: 0.1 },
+            idle_right: { row: 1, startFrame: 0,  frames: 6, speed: 0.15 },
+            idle_up:    { row: 1, startFrame: 6,  frames: 6, speed: 0.15 },
+            idle_left:  { row: 1, startFrame: 12, frames: 6, speed: 0.15 },
+            idle_down:  { row: 1, startFrame: 18, frames: 6, speed: 0.15 },
+            walk_right: { row: 2, startFrame: 0,  frames: 6, speed: 0.1 },
+            walk_up:    { row: 2, startFrame: 6,  frames: 6, speed: 0.1 },
+            walk_left:  { row: 2, startFrame: 12, frames: 6, speed: 0.1 },
+            walk_down:  { row: 2, startFrame: 18, frames: 6, speed: 0.1 },
         };
     }
 
@@ -86,7 +87,8 @@ class CharacterSpriteManager {
         const anim = this.animations[animState] || this.animations.idle_down;
         const frameIndex = Math.floor(frameTime / anim.speed) % anim.frames;
 
-        const srcX = frameIndex * this.frameWidth;
+        // startFrame is the horizontal offset for this direction within the row
+        const srcX = (anim.startFrame + frameIndex) * this.frameWidth;
         const srcY = anim.row * this.frameHeight;
         const destWidth = this.frameWidth * this.scale;
         const destHeight = this.frameHeight * this.scale;
