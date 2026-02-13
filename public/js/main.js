@@ -7,17 +7,20 @@ const MAX_USERNAME_LENGTH = (typeof CONFIG !== 'undefined' && CONFIG.MAX_USERNAM
   ? CONFIG.MAX_USERNAME_LENGTH
   : 32;
 
-let game = null;
-let networkManager = null;
-let currentUsername = '';
-let currentRoomPlayers = [];
-let currentProfile = null;
-let playerUpdateInterval = null; // Track interval to prevent leaks
-let enemySyncInterval = null; // Track enemy sync interval
-let currentHostId = null; // Track the current host ID across game creation
-let browseManager = null; // Separate connection for browsing room list
-let inventorySaveTimeout = null;
-let selectedCharacter = 1; // Default to character 1 (range: 1-7 for players)
+// Consolidated game state to reduce global namespace pollution
+const gameState = {
+    game: null,
+    networkManager: null,
+    currentUsername: '',
+    currentRoomPlayers: [],
+    currentProfile: null,
+    playerUpdateInterval: null, // Track interval to prevent leaks
+    enemySyncInterval: null, // Track enemy sync interval
+    currentHostId: null, // Track the current host ID across game creation
+    browseManager: null, // Separate connection for browsing room list
+    inventorySaveTimeout: null,
+    selectedCharacter: 1 // Default to character 1 (range: 1-7 for players)
+};
 
 // Helper function to update balance display
 function updateBalanceDisplay(balance) {
@@ -37,7 +40,7 @@ function initCharacterSelector() {
     // Characters 1-7 are for players
     for (let i = 1; i <= 7; i++) {
         const option = document.createElement('div');
-        option.className = 'character-option' + (i === selectedCharacter ? ' selected' : '');
+        option.className = 'character-option' + (i === gameState.selectedCharacter ? ' selected' : '');
         option.dataset.character = i;
 
         // Create canvas for character preview
@@ -93,7 +96,7 @@ function drawCharacterPreview(canvas, characterNum) {
 
 // Select a character
 function selectCharacter(num) {
-    selectedCharacter = num;
+    gameState.selectedCharacter = num;
     localStorage.setItem('selectedCharacter', num);
 
     // Update UI
@@ -123,10 +126,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Check for saved character selection
     const savedCharacter = localStorage.getItem('selectedCharacter');
     if (savedCharacter) {
-        selectedCharacter = parseInt(savedCharacter) || 1;
+        gameState.selectedCharacter = parseInt(savedCharacter) || 1;
         // Clamp to valid range (1-7 for players)
-        if (selectedCharacter < 1 || selectedCharacter > 7) {
-            selectedCharacter = 1;
+        if (gameState.selectedCharacter < 1 || gameState.selectedCharacter > 7) {
+            gameState.selectedCharacter = 1;
         }
     }
 
@@ -166,7 +169,7 @@ function setupEventListeners() {
             alert('Username must start and end with alphanumeric characters and can only contain letters, numbers, spaces, underscores, and hyphens');
             return;
         }
-        currentUsername = username;
+        gameState.currentUsername = username;
         localStorage.setItem('username', username);
 
         await loadProfile(username);
@@ -191,21 +194,21 @@ function setupEventListeners() {
             alert('Please enter your name');
             return;
         }
-        currentUsername = username;
-        
+        gameState.currentUsername = username;
+
         // Stop browsing before joining
         stopRoomBrowsing();
-        
+
         // Initialize network
-        if (!networkManager) {
-            networkManager = new NetworkManager();
+        if (!gameState.networkManager) {
+            gameState.networkManager = new NetworkManager();
             try {
-                await networkManager.connect();
-                
+                await gameState.networkManager.connect();
+
                 const roomId = 'room-' + Math.random().toString(36).substring(2, 11);
                 const playerId = 'player-' + Math.random().toString(36).substring(2, 11);
 
-                networkManager.joinRoom(roomId, playerId, username, selectedCharacter);
+                gameState.networkManager.joinRoom(roomId, playerId, username, gameState.selectedCharacter);
                 
                 document.getElementById('roomCode').textContent = roomId;
                 
@@ -217,36 +220,36 @@ function setupEventListeners() {
             }
         }
     });
-    
+
     document.getElementById('recallBtn').addEventListener('click', () => {
         recallToHub();
     });
 
     // Lobby
     document.getElementById('startAdventureBtn').addEventListener('click', () => {
-        if (networkManager) {
-            networkManager.startGame();
+        if (gameState.networkManager) {
+            gameState.networkManager.startGame();
         }
         startGame('hub');
     });
     
     document.getElementById('leaveLobbyBtn').addEventListener('click', () => {
-        if (networkManager) {
-            networkManager.leaveRoom();
-            networkManager.disconnect();
-            networkManager = null;
+        if (gameState.networkManager) {
+            gameState.networkManager.leaveRoom();
+            gameState.networkManager.disconnect();
+            gameState.networkManager = null;
         }
-        if (playerUpdateInterval) {
-            clearInterval(playerUpdateInterval);
-            playerUpdateInterval = null;
+        if (gameState.playerUpdateInterval) {
+            clearInterval(gameState.playerUpdateInterval);
+            gameState.playerUpdateInterval = null;
         }
         stopEnemySyncInterval();
         // Clean up game instance to prevent memory leaks from event listeners
-        if (game) {
-            game.destroy();
-            game = null;
+        if (gameState.game) {
+            gameState.game.destroy();
+            gameState.game = null;
         }
-        currentHostId = null;
+        gameState.currentHostId = null;
         showScreen('menu');
 
         // Resume room browsing
@@ -256,47 +259,47 @@ function setupEventListeners() {
 }
 
 function setupNetworkHandlers() {
-    networkManager.onRoomUpdate = (data) => {
+    gameState.networkManager.onRoomUpdate = (data) => {
         updatePlayersList(data.players);
-        currentRoomPlayers = data.players || [];
-        if (game && networkManager) {
+        gameState.currentRoomPlayers = data.players || [];
+        if (gameState.game && gameState.networkManager) {
             // Only sync players that are in the same zone as the local player
-            const localZoneId = game.zoneId || 'hub';
-            const zonePlayers = currentRoomPlayers.filter(p => p.zone === localZoneId);
-            game.syncMultiplayerPlayers(zonePlayers, networkManager.playerId);
+            const localZoneId = gameState.game.zoneId || 'hub';
+            const zonePlayers = gameState.currentRoomPlayers.filter(p => p.zone === localZoneId);
+            gameState.game.syncMultiplayerPlayers(zonePlayers, gameState.networkManager.playerId);
             hydrateRoomAvatars(zonePlayers);
         }
         // Update host status from room_update
-        if (data.hostId && networkManager) {
+        if (data.hostId && gameState.networkManager) {
             updateHostStatus(data.hostId);
         }
     };
-    
-    networkManager.onPlayerState = (data) => {
-        if (game && game.localPlayer) {
+
+    gameState.networkManager.onPlayerState = (data) => {
+        if (gameState.game && gameState.game.localPlayer) {
             // Never apply state to local player (check by ID, not reference)
-            if (data.playerId === game.localPlayer.id) {
+            if (data.playerId === gameState.game.localPlayer.id) {
                 return;
             }
-            const player = game.players.find(p => p.id === data.playerId);
+            const player = gameState.game.players.find(p => p.id === data.playerId);
             if (player) {
                 player.setState(data.state);
             }
         }
     };
-    
-    networkManager.onGameStart = (data) => {
+
+    gameState.networkManager.onGameStart = (data) => {
         startGame('hub');
     };
 
-    networkManager.onZoneEnter = async (data) => {
+    gameState.networkManager.onZoneEnter = async (data) => {
         // This is for the LOCAL player entering a zone
-        if (game && data.zoneId && data.playerId === networkManager.playerId) {
+        if (gameState.game && data.zoneId && data.playerId === gameState.networkManager.playerId) {
             const zonePlayers = data.zonePlayers || [];
-            await game.transitionZone(data.zoneId, zonePlayers, networkManager.playerId);
+            await gameState.game.transitionZone(data.zoneId, zonePlayers, gameState.networkManager.playerId);
 
             // Update our own zone in currentRoomPlayers BEFORE checking zone host status
-            const selfInRoster = currentRoomPlayers.find(p => p.id === networkManager.playerId);
+            const selfInRoster = gameState.currentRoomPlayers.find(p => p.id === gameState.networkManager.playerId);
             if (selfInRoster) {
                 selfInRoster.zone = data.zoneId;
             }
@@ -306,56 +309,56 @@ function setupNetworkHandlers() {
         }
     };
 
-    networkManager.onPlayerZoneChange = (data) => {
+    gameState.networkManager.onPlayerZoneChange = (data) => {
         // Another player changed zones - update tracking, don't transition local player
-        if (!game || !data.playerId || !data.zoneId) return;
+        if (!gameState.game || !data.playerId || !data.zoneId) return;
 
         // Update the player's zone in currentRoomPlayers
-        const playerInfo = currentRoomPlayers.find(p => p.id === data.playerId);
+        const playerInfo = gameState.currentRoomPlayers.find(p => p.id === data.playerId);
         if (playerInfo) {
             playerInfo.zone = data.zoneId;
         }
 
         // If the host changed zones, update zone host status
-        if (data.playerId === currentHostId) {
+        if (data.playerId === gameState.currentHostId) {
             updateZoneHostStatus();
         }
 
         // If they left our zone, remove them from game.players
         // If they entered our zone, add them
-        const localZoneId = game.zoneId || 'hub';
+        const localZoneId = gameState.game.zoneId || 'hub';
         if (data.zoneId !== localZoneId) {
-            game.players = game.players.filter(p => p.id !== data.playerId);
+            gameState.game.players = gameState.game.players.filter(p => p.id !== data.playerId);
         } else if (data.zoneId === localZoneId) {
             // Player entered our zone - add them if not already present
             // Never add local player as duplicate
-            if (data.playerId === networkManager.playerId) return;
+            if (data.playerId === gameState.networkManager.playerId) return;
 
-            const existingPlayer = game.players.find(p => p.id === data.playerId);
+            const existingPlayer = gameState.game.players.find(p => p.id === data.playerId);
             if (!existingPlayer && playerInfo) {
                 const colors = ['#e74c3c', '#2ecc71', '#f1c40f', '#9b59b6', '#1abc9c'];
-                const color = colors[game.players.length % colors.length];
+                const color = colors[gameState.game.players.length % colors.length];
                 const newPlayer = new Player(
-                    game.zone.startX,
-                    game.zone.startY,
+                    gameState.game.zone.startX,
+                    gameState.game.zone.startY,
                     color,
                     data.playerId,
                     playerInfo.username,
                     playerInfo.character
                 );
-                game.players.push(newPlayer);
+                gameState.game.players.push(newPlayer);
             }
         }
     };
-    
-    networkManager.onBalanceUpdate = (data) => {
+
+    gameState.networkManager.onBalanceUpdate = (data) => {
         updateBalanceDisplay(data.balance);
     };
-    
-    networkManager.onEnemyRespawn = (data) => {
-        if (game && data.enemyId && data.zone) {
+
+    gameState.networkManager.onEnemyRespawn = (data) => {
+        if (gameState.game && data.enemyId && data.zone) {
             // Only respawn if player is in the same zone
-            if (game.zoneId !== data.zone) return;
+            if (gameState.game.zoneId !== data.zone) return;
 
             // Re-add the enemy to the game
             // Note: Zone IDs are lowercase keys (e.g., 'hub', 'training')
@@ -371,71 +374,71 @@ function setupNetworkHandlers() {
                         hp: enemyConfig.hp,
                         maxHp: enemyConfig.maxHp
                     });
-                    game.enemies.push(enemy);
+                    gameState.game.enemies.push(enemy);
                 }
             }
         }
     };
-    
-    networkManager.onEnemySync = (data) => {
+
+    gameState.networkManager.onEnemySync = (data) => {
         // Apply enemy sync if we're not authoritative, OR during grace period after zone transition
         // Grace period allows zone host to hand off enemy state when main host enters their zone
-        const inGracePeriod = game && game.zoneTransitionGrace > 0;
-        const isAuthoritative = game && (game.isHost || game.isZoneHost);
+        const inGracePeriod = gameState.game && gameState.game.zoneTransitionGrace > 0;
+        const isAuthoritative = gameState.game && (gameState.game.isHost || gameState.game.isZoneHost);
 
-        if (game && (!isAuthoritative || inGracePeriod)) {
-            game.applyEnemySync(data.enemies);
+        if (gameState.game && (!isAuthoritative || inGracePeriod)) {
+            gameState.game.applyEnemySync(data.enemies);
         }
     };
-    
-    networkManager.onHostAssigned = (data) => {
-        if (data.hostId && networkManager) {
+
+    gameState.networkManager.onHostAssigned = (data) => {
+        if (data.hostId && gameState.networkManager) {
             updateHostStatus(data.hostId);
         }
     };
-    
-    networkManager.onEnemyDamage = (data) => {
+
+    gameState.networkManager.onEnemyDamage = (data) => {
         // Host or zone host receives damage reports from other players
-        const isAuthoritative = game && (game.isHost || game.isZoneHost);
+        const isAuthoritative = gameState.game && (gameState.game.isHost || gameState.game.isZoneHost);
         if (isAuthoritative && data.enemyId && typeof data.damage === 'number') {
-            const enemy = game.enemies.find(e => e.id === data.enemyId);
+            const enemy = gameState.game.enemies.find(e => e.id === data.enemyId);
             if (enemy) {
                 enemy.takeDamage(data.damage);
             }
         }
     };
-    
-    networkManager.onPlayerLeft = (data) => {
-        if (game) {
-            game.players = game.players.filter(p => p.id !== data.playerId);
+
+    gameState.networkManager.onPlayerLeft = (data) => {
+        if (gameState.game) {
+            gameState.game.players = gameState.game.players.filter(p => p.id !== data.playerId);
         }
     };
 
-    networkManager.onRoomFull = (data) => {
+    gameState.networkManager.onRoomFull = (data) => {
         alert(`Room is full. Max party size is ${data.maxPlayers}.`);
-        networkManager.disconnect();
-        networkManager = null;
+        gameState.networkManager.disconnect();
+        gameState.networkManager = null;
         showScreen('menu');
     };
 
-    networkManager.onPlayerFire = (data) => {
+    gameState.networkManager.onPlayerFire = (data) => {
         // Another player fired - spawn visual projectile
-        if (game && data.playerId && data.playerId !== networkManager.playerId) {
-            game.spawnRemoteProjectile(data.x, data.y, data.angle, data.playerId);
+        if (gameState.game && data.playerId && data.playerId !== gameState.networkManager.playerId) {
+            gameState.game.spawnRemoteProjectile(data.x, data.y, data.angle, data.playerId);
         }
     };
 }
 
 function updateHostStatus(hostId) {
-    currentHostId = hostId;
-    if (!game || !networkManager) return;
-    const wasHost = game.isHost;
-    game.isHost = (networkManager.playerId === hostId);
+    gameState.currentHostId = hostId;
+    if (!gameState.game || !gameState.networkManager) return;
+    const wasHost = gameState.game.isHost;
+    gameState.game.isHost = (gameState.networkManager.playerId === hostId);
 
-    if (game.isHost && !wasHost) {
+    if (gameState.game.isHost && !wasHost) {
         // Start enemy sync interval when becoming host
         startEnemySyncInterval();
-    } else if (!game.isHost && wasHost) {
+    } else if (!gameState.game.isHost && wasHost) {
         // Stop enemy sync interval when losing host status
         stopEnemySyncInterval();
     }
@@ -445,40 +448,40 @@ function updateHostStatus(hostId) {
 }
 
 function updateZoneHostStatus() {
-    if (!game || !networkManager) return;
+    if (!gameState.game || !gameState.networkManager) return;
 
     // If we're the main host, we're authoritative for our zone
-    if (game.isHost) {
-        game.isZoneHost = false; // isHost takes precedence
+    if (gameState.game.isHost) {
+        gameState.game.isZoneHost = false; // isHost takes precedence
         return;
     }
 
     // Check if the main host is in our zone
-    const localZone = game.zoneId || 'hub';
-    const hostPlayer = currentRoomPlayers.find(p => p.id === currentHostId);
+    const localZone = gameState.game.zoneId || 'hub';
+    const hostPlayer = gameState.currentRoomPlayers.find(p => p.id === gameState.currentHostId);
     const hostZone = hostPlayer ? hostPlayer.zone : 'hub';
 
-    const wasZoneHost = game.isZoneHost;
+    const wasZoneHost = gameState.game.isZoneHost;
 
     // If host is in our zone, we're not zone host
     if (hostZone === localZone) {
-        game.isZoneHost = false;
+        gameState.game.isZoneHost = false;
     } else {
         // Host is in a different zone - select ONE zone host deterministically
         // The player with the smallest ID in this zone becomes zone host
-        const playersInMyZone = currentRoomPlayers
-            .filter(p => p.zone === localZone && p.id !== currentHostId)
+        const playersInMyZone = gameState.currentRoomPlayers
+            .filter(p => p.zone === localZone && p.id !== gameState.currentHostId)
             .sort((a, b) => a.id.localeCompare(b.id));
 
         const zoneHostId = playersInMyZone.length > 0 ? playersInMyZone[0].id : null;
-        game.isZoneHost = (zoneHostId === networkManager.playerId);
+        gameState.game.isZoneHost = (zoneHostId === gameState.networkManager.playerId);
     }
 
     // Start/stop enemy sync based on zone host status change
-    if (game.isZoneHost && !wasZoneHost) {
+    if (gameState.game.isZoneHost && !wasZoneHost) {
         console.log('Became zone host for zone:', localZone);
         startEnemySyncInterval();
-    } else if (!game.isZoneHost && wasZoneHost && !game.isHost) {
+    } else if (!gameState.game.isZoneHost && wasZoneHost && !gameState.game.isHost) {
         console.log('Lost zone host status');
         stopEnemySyncInterval();
     }
@@ -486,15 +489,15 @@ function updateZoneHostStatus() {
 
 function startEnemySyncInterval() {
     stopEnemySyncInterval();
-    enemySyncInterval = setInterval(() => {
+    gameState.enemySyncInterval = setInterval(() => {
         // Both main host and zone host should send enemy syncs
         // But not during grace period (allows receiving handoff from previous zone host)
-        const isAuthoritative = game && game.running && (game.isHost || game.isZoneHost);
-        const inGracePeriod = game && game.zoneTransitionGrace > 0;
+        const isAuthoritative = gameState.game && gameState.game.running && (gameState.game.isHost || gameState.game.isZoneHost);
+        const inGracePeriod = gameState.game && gameState.game.zoneTransitionGrace > 0;
 
-        if (isAuthoritative && !inGracePeriod && networkManager && networkManager.connected) {
+        if (isAuthoritative && !inGracePeriod && gameState.networkManager && gameState.networkManager.connected) {
             // Always send sync, even if empty (so clients know all enemies are dead)
-            networkManager.sendEnemySync(game.enemies.map(e => ({
+            gameState.networkManager.sendEnemySync(gameState.game.enemies.map(e => ({
                 id: e.id,
                 x: e.x,
                 y: e.y,
@@ -509,25 +512,25 @@ function startEnemySyncInterval() {
 }
 
 function stopEnemySyncInterval() {
-    if (enemySyncInterval) {
-        clearInterval(enemySyncInterval);
-        enemySyncInterval = null;
+    if (gameState.enemySyncInterval) {
+        clearInterval(gameState.enemySyncInterval);
+        gameState.enemySyncInterval = null;
     }
 }
 
 async function startRoomBrowsing() {
     stopRoomBrowsing();
-    
+
     const browserEl = document.getElementById('roomBrowser');
     if (browserEl) browserEl.style.display = 'block';
-    
-    browseManager = new NetworkManager();
+
+    gameState.browseManager = new NetworkManager();
     try {
-        await browseManager.connect();
-        browseManager.onRoomList = (data) => {
+        await gameState.browseManager.connect();
+        gameState.browseManager.onRoomList = (data) => {
             renderRoomList(data.rooms || []);
         };
-        browseManager.requestRoomList();
+        gameState.browseManager.requestRoomList();
     } catch (error) {
         console.error('Failed to connect for room browsing:', error);
         renderRoomList([]);
@@ -535,9 +538,9 @@ async function startRoomBrowsing() {
 }
 
 function stopRoomBrowsing() {
-    if (browseManager) {
-        browseManager.disconnect();
-        browseManager = null;
+    if (gameState.browseManager) {
+        gameState.browseManager.disconnect();
+        gameState.browseManager = null;
     }
     const browserEl = document.getElementById('roomBrowser');
     if (browserEl) browserEl.style.display = 'none';
@@ -587,25 +590,25 @@ function renderRoomList(rooms) {
 }
 
 async function joinExistingRoom(roomId) {
-    if (!currentUsername) {
+    if (!gameState.currentUsername) {
         alert('Please enter your name first');
         return;
     }
-    
+
     // Stop browsing before joining
     stopRoomBrowsing();
-    
-    if (!networkManager) {
-        networkManager = new NetworkManager();
+
+    if (!gameState.networkManager) {
+        gameState.networkManager = new NetworkManager();
         try {
-            await networkManager.connect();
-            
+            await gameState.networkManager.connect();
+
             const playerId = 'player-' + Math.random().toString(36).substring(2, 11);
 
-            networkManager.joinRoom(roomId, playerId, currentUsername, selectedCharacter);
+            gameState.networkManager.joinRoom(roomId, playerId, gameState.currentUsername, gameState.selectedCharacter);
 
             document.getElementById('roomCode').textContent = roomId;
-            
+
             setupNetworkHandlers();
             showScreen('lobby');
         } catch (error) {
@@ -623,7 +626,7 @@ async function loadProfile(username) {
             return;
         }
         const data = await res.json();
-        currentProfile = data;
+        gameState.currentProfile = data;
 
         const nameEl = document.getElementById('profileName');
         if (nameEl) nameEl.textContent = data.name || username;
@@ -637,11 +640,11 @@ async function loadProfile(username) {
         const avatarUrl = data.character && data.character.dataURL ? data.character.dataURL : '';
         updateAvatar('profileAvatarImg', 'profileAvatarPlaceholder', avatarUrl);
         updateAvatar('hudAvatarImg', 'hudAvatarPlaceholder', avatarUrl);
-        if (game && game.localPlayer) {
-            game.localPlayer.setAvatar(avatarUrl);
+        if (gameState.game && gameState.game.localPlayer) {
+            gameState.game.localPlayer.setAvatar(avatarUrl);
         }
-        if (game) {
-            game.setInventory(data.inventory || []);
+        if (gameState.game) {
+            gameState.game.setInventory(data.inventory || []);
         }
     } catch (error) {
         console.error('Failed to load profile:', error);
@@ -649,25 +652,25 @@ async function loadProfile(username) {
 }
 
 function scheduleInventorySave(inventory) {
-    if (!currentUsername) return;
-    if (inventorySaveTimeout) {
-        clearTimeout(inventorySaveTimeout);
+    if (!gameState.currentUsername) return;
+    if (gameState.inventorySaveTimeout) {
+        clearTimeout(gameState.inventorySaveTimeout);
     }
 
-    inventorySaveTimeout = setTimeout(async () => {
+    gameState.inventorySaveTimeout = setTimeout(async () => {
         try {
             const response = await fetch('/api/inventory', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    username: currentUsername,
+                    username: gameState.currentUsername,
                     inventory
                 })
             });
             if (response.ok) {
                 const data = await response.json();
-                if (currentProfile) {
-                    currentProfile.inventory = Array.isArray(data.inventory) ? data.inventory : inventory;
+                if (gameState.currentProfile) {
+                    gameState.currentProfile.inventory = Array.isArray(data.inventory) ? data.inventory : inventory;
                 }
             }
         } catch (error) {
@@ -677,10 +680,10 @@ function scheduleInventorySave(inventory) {
 }
 
 async function hydrateRoomAvatars(players) {
-    if (!game || !players) return;
+    if (!gameState.game || !players) return;
     const targets = players.filter(p => {
         if (!p || !p.username) return false;
-        const playerObj = game.players.find(player => player.username === p.username);
+        const playerObj = gameState.game.players.find(player => player.username === p.username);
         return playerObj && !playerObj.avatarUrl;
     });
     if (targets.length === 0) return;
@@ -695,7 +698,7 @@ async function hydrateRoomAvatars(players) {
     results.forEach((data, i) => {
         if (!data || !data.character || !data.character.dataURL) return;
         const targetUsername = targets[i].username;
-        const playerObj = game.players.find(player => player.username === targetUsername);
+        const playerObj = gameState.game.players.find(player => player.username === targetUsername);
         if (playerObj) playerObj.setAvatar(data.character.dataURL);
     });
 }
@@ -728,92 +731,92 @@ function updatePlayersList(players) {
 }
 
 async function startGame(zoneName) {
-    if (!game) {
-        game = new Game();
+    if (!gameState.game) {
+        gameState.game = new Game();
     }
 
-    const playerId = networkManager ? networkManager.playerId : 'player1';
-    console.log('Starting game:', { zoneName, playerId, isHost: currentHostId === playerId, character: selectedCharacter });
-    await game.init(zoneName, currentUsername, playerId, selectedCharacter);
-    game.onPortalEnter = (targetZoneId) => {
-        if (networkManager && networkManager.connected) {
-            networkManager.enterZone(targetZoneId);
+    const playerId = gameState.networkManager ? gameState.networkManager.playerId : 'player1';
+    console.log('Starting game:', { zoneName, playerId, isHost: gameState.currentHostId === playerId, character: gameState.selectedCharacter });
+    await gameState.game.init(zoneName, gameState.currentUsername, playerId, gameState.selectedCharacter);
+    gameState.game.onPortalEnter = (targetZoneId) => {
+        if (gameState.networkManager && gameState.networkManager.connected) {
+            gameState.networkManager.enterZone(targetZoneId);
         } else {
             console.error('No network connection for portal transition');
         }
     };
-    
+
     // Wire up enemy kill callback
-    game.onEnemyKilled = (enemyId, zone) => {
-        if (networkManager && networkManager.connected) {
-            networkManager.sendEnemyKilled(enemyId, zone);
+    gameState.game.onEnemyKilled = (enemyId, zone) => {
+        if (gameState.networkManager && gameState.networkManager.connected) {
+            gameState.networkManager.sendEnemyKilled(enemyId, zone);
         }
     };
-    
+
     // Wire up enemy damage callback for non-host players
-    game.onEnemyDamage = (enemyId, damage) => {
-        if (networkManager && networkManager.connected) {
-            networkManager.sendEnemyDamage(enemyId, damage);
+    gameState.game.onEnemyDamage = (enemyId, damage) => {
+        if (gameState.networkManager && gameState.networkManager.connected) {
+            gameState.networkManager.sendEnemyDamage(enemyId, damage);
         }
     };
-    game.onInventoryChanged = (inventory) => {
+    gameState.game.onInventoryChanged = (inventory) => {
         scheduleInventorySave(inventory);
     };
 
     // Wire up death penalty callback
-    game.onPlayerDeath = () => {
+    gameState.game.onPlayerDeath = () => {
         // Clear local inventory
-        game.setInventory([]);
+        gameState.game.setInventory([]);
 
         // Notify server to apply death penalty (coin deduction + clear DB inventory)
-        if (networkManager && networkManager.connected) {
-            networkManager.sendPlayerDeath(game.zoneId || 'unknown');
+        if (gameState.networkManager && gameState.networkManager.connected) {
+            gameState.networkManager.sendPlayerDeath(gameState.game.zoneId || 'unknown');
         }
     };
 
     // Wire up projectile sync callback
-    game.onPlayerFire = (x, y, angle) => {
-        if (networkManager && networkManager.connected) {
-            networkManager.sendPlayerFire(x, y, angle);
+    gameState.game.onPlayerFire = (x, y, angle) => {
+        if (gameState.networkManager && gameState.networkManager.connected) {
+            gameState.networkManager.sendPlayerFire(x, y, angle);
         }
     };
 
-    if (currentProfile && Array.isArray(currentProfile.inventory)) {
-        game.setInventory(currentProfile.inventory);
+    if (gameState.currentProfile && Array.isArray(gameState.currentProfile.inventory)) {
+        gameState.game.setInventory(gameState.currentProfile.inventory);
     }
 
     // Apply host status BEFORE starting game loop (fixes first shots not dealing damage)
-    if (networkManager && currentHostId) {
-        updateHostStatus(currentHostId);
+    if (gameState.networkManager && gameState.currentHostId) {
+        updateHostStatus(gameState.currentHostId);
     }
 
     showScreen('game');
-    game.start();
+    gameState.game.start();
 
     // Send updates to server
-    if (networkManager) {
-        
+    if (gameState.networkManager) {
+
         // Only sync players in the same zone (hub for initial game start)
-        const localZoneId = game.zoneId || 'hub';
-        const zonePlayers = currentRoomPlayers.filter(p => p.zone === localZoneId);
-        game.syncMultiplayerPlayers(zonePlayers, networkManager.playerId);
-        
+        const localZoneId = gameState.game.zoneId || 'hub';
+        const zonePlayers = gameState.currentRoomPlayers.filter(p => p.zone === localZoneId);
+        gameState.game.syncMultiplayerPlayers(zonePlayers, gameState.networkManager.playerId);
+
         // Clear previous interval to prevent leaks
-        if (playerUpdateInterval) {
-            clearInterval(playerUpdateInterval);
-            playerUpdateInterval = null;
+        if (gameState.playerUpdateInterval) {
+            clearInterval(gameState.playerUpdateInterval);
+            gameState.playerUpdateInterval = null;
         }
 
         // Track last sent state to avoid redundant updates
         let lastSentState = null;
-        
-        playerUpdateInterval = setInterval(() => {
-            if (game.localPlayer && game.running) {
-                const currentState = game.localPlayer.getState();
-                
+
+        gameState.playerUpdateInterval = setInterval(() => {
+            if (gameState.game.localPlayer && gameState.game.running) {
+                const currentState = gameState.game.localPlayer.getState();
+
                 // Only send if state has changed significantly
                 if (!lastSentState || hasSignificantChange(lastSentState, currentState)) {
-                    networkManager.sendPlayerUpdate(currentState);
+                    gameState.networkManager.sendPlayerUpdate(currentState);
                     lastSentState = currentState;
                 }
             }
@@ -838,17 +841,17 @@ function hasSignificantChange(oldState, newState) {
 }
 
 function recallToHub() {
-    if (!game) return;
-    if (game.zone && game.zone.isHub) return;
+    if (!gameState.game) return;
+    if (gameState.game.zone && gameState.game.zone.isHub) return;
 
     // If player is dead, handle respawn first
-    if (game.localPlayer && game.localPlayer.isDead) {
-        game.hideDeathScreen();
-        game.localPlayer.respawn();
+    if (gameState.game.localPlayer && gameState.game.localPlayer.isDead) {
+        gameState.game.hideDeathScreen();
+        gameState.game.localPlayer.respawn();
     }
 
-    if (networkManager && networkManager.connected) {
-        networkManager.enterZone('hub');
+    if (gameState.networkManager && gameState.networkManager.connected) {
+        gameState.networkManager.enterZone('hub');
     } else {
         console.error('No network connection for recall');
     }

@@ -273,7 +273,10 @@ class Game {
 
         // Grace period after zone transition - accept enemy syncs even if host
         // This allows the previous zone host to hand off their enemy state
-        this.zoneTransitionGrace = 0.5; // 500ms grace period
+        const gracePeriod = (typeof CONFIG !== 'undefined' && CONFIG.ZONE_TRANSITION_GRACE_MS)
+            ? CONFIG.ZONE_TRANSITION_GRACE_MS / 1000
+            : 0.5;
+        this.zoneTransitionGrace = gracePeriod;
         
         // Spawn enemies from zone data
         if (zoneData.enemies && Array.isArray(zoneData.enemies)) {

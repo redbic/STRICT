@@ -31,6 +31,18 @@ const wss = new WebSocket.Server({
 const PORT = process.env.PORT || 3000;
 const ENEMY_KILL_REWARD = 5;
 const DEATH_PENALTY_COINS = 20;
+const ENEMY_RESPAWN_DELAY_MS = 10000; // 10 seconds
+
+// Debug logging helper - only logs in development mode
+const DEBUG = process.env.NODE_ENV !== 'production';
+function debugLog(handler, message, data = null) {
+  if (!DEBUG) return;
+  if (data) {
+    console.debug(`[WS:${handler}]`, message, data);
+  } else {
+    console.debug(`[WS:${handler}]`, message);
+  }
+}
 // Inbound WebSocket message types (client -> server)
 const WS_MESSAGE_TYPES = new Set([
   'join_room',
@@ -176,6 +188,10 @@ app.get('/api/profile', async (req, res) => {
   }
 });
 
+// Inventory Save: Client-authoritative model
+// The client sends full inventory state, server trusts it after sanitization.
+// This is acceptable for cooperative play. For a competitive game, this would
+// need server-side item tracking with item generation/consumption validation.
 app.post('/api/inventory', async (req, res) => {
   const username = normalizeSafeString(req.body.username);
   if (!username || !isValidUsername(username)) {
@@ -449,6 +465,7 @@ function handleJoinRoom(ws, data) {
   const { roomId, playerId, username, character } = data;
 
   if (!isValidRoomId(roomId) || !isValidPlayerId(playerId) || !isValidUsername(username)) {
+    debugLog('join_room', 'invalid input', { roomId, playerId, username });
     return;
   }
 
@@ -522,11 +539,20 @@ function handleLeaveRoom(ws) {
 }
 
 function handlePlayerUpdate(ws, data) {
-  if (!ws.roomId) return;
+  if (!ws.roomId) {
+    debugLog('player_update', 'no roomId');
+    return;
+  }
   const room = rooms.getRoom(ws.roomId);
-  if (!room) return;
+  if (!room) {
+    debugLog('player_update', 'room not found', { roomId: ws.roomId });
+    return;
+  }
 
-  if (!isValidPlayerState(data.state)) return;
+  if (!isValidPlayerState(data.state)) {
+    debugLog('player_update', 'invalid state');
+    return;
+  }
 
   const sender = room.players.find(p => p.id === ws.playerId);
   if (!sender) return;
@@ -549,10 +575,22 @@ function handleGameStart(ws) {
   broadcastRoomList();
 }
 
+// Zone Transition Pattern:
+// Client initiates zone_enter, server validates and broadcasts player_zone to room,
+// then sends zone_enter back to the client with list of players in that zone.
+// The client has a 500ms grace period (zoneTransitionGrace) during which it will
+// accept enemy syncs even if it's the authoritative host - this allows the previous
+// zone host to hand off their enemy state during transitions.
 function handleZoneEnter(ws, data) {
-  if (!ws.roomId || !data.zoneId) return;
+  if (!ws.roomId || !data.zoneId) {
+    debugLog('zone_enter', 'missing roomId or zoneId');
+    return;
+  }
   const zoneId = normalizeSafeString(data.zoneId);
-  if (!isValidZoneId(zoneId)) return;
+  if (!isValidZoneId(zoneId)) {
+    debugLog('zone_enter', 'invalid zoneId', { zoneId });
+    return;
+  }
 
   const room = rooms.getRoom(ws.roomId);
   if (!room) return;
@@ -602,7 +640,7 @@ async function handleEnemyKilled(ws, data) {
   }
 
   // Respawn timer for all zones
-  const respawnDelay = 10000;
+  const respawnDelay = ENEMY_RESPAWN_DELAY_MS;
   if (room.respawnTimers.has(enemyKey)) {
     clearTimeout(room.respawnTimers.get(enemyKey));
   }
@@ -625,8 +663,14 @@ async function handleEnemyKilled(ws, data) {
 }
 
 function handleEnemySync(ws, data) {
-  if (!ws.roomId || !Array.isArray(data.enemies)) return;
-  if (data.enemies.length > WS_MAX_ENEMY_SYNC_COUNT) return;
+  if (!ws.roomId || !Array.isArray(data.enemies)) {
+    debugLog('enemy_sync', 'missing roomId or enemies');
+    return;
+  }
+  if (data.enemies.length > WS_MAX_ENEMY_SYNC_COUNT) {
+    debugLog('enemy_sync', 'too many enemies', { count: data.enemies.length });
+    return;
+  }
 
   const room = rooms.getRoom(ws.roomId);
   if (!room) return;
@@ -646,8 +690,14 @@ function handleEnemySync(ws, data) {
 }
 
 function handleEnemyDamage(ws, data) {
-  if (!ws.roomId || !data.enemyId || typeof data.damage !== 'number') return;
-  if (data.damage < 0 || data.damage > 100) return;
+  if (!ws.roomId || !data.enemyId || typeof data.damage !== 'number') {
+    debugLog('enemy_damage', 'missing required fields');
+    return;
+  }
+  if (data.damage < 0 || data.damage > 100) {
+    debugLog('enemy_damage', 'invalid damage value', { damage: data.damage });
+    return;
+  }
 
   const room = rooms.getRoom(ws.roomId);
   if (!room) return;

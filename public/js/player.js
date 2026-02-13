@@ -149,7 +149,10 @@ class Player {
         }
 
         // Update speed for network sync (normalized to ~0-3 range for compatibility)
-        this.speed = Math.hypot(this.velocityX, this.velocityY) / 60;
+        const normFactor = (typeof CONFIG !== 'undefined' && CONFIG.SPEED_NORMALIZATION_FACTOR)
+            ? CONFIG.SPEED_NORMALIZATION_FACTOR
+            : 60;
+        this.speed = Math.hypot(this.velocityX, this.velocityY) / normFactor;
 
         // Store old position
         const oldX = this.x;

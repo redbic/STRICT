@@ -25,25 +25,35 @@ class NetworkManager {
         return new Promise((resolve, reject) => {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const wsUrl = `${protocol}//${window.location.host}`;
-            
+
+            // Connection timeout (10 seconds)
+            const timeout = setTimeout(() => {
+                if (this.ws) {
+                    this.ws.close();
+                }
+                reject(new Error('Connection timeout'));
+            }, 10000);
+
             this.ws = new WebSocket(wsUrl);
-            
+
             this.ws.onopen = () => {
+                clearTimeout(timeout);
                 console.log('WebSocket connected');
                 this.connected = true;
                 resolve();
             };
-            
+
             this.ws.onerror = (error) => {
+                clearTimeout(timeout);
                 console.error('WebSocket error:', error);
                 reject(error);
             };
-            
+
             this.ws.onclose = () => {
                 console.log('WebSocket closed');
                 this.connected = false;
             };
-            
+
             this.ws.onmessage = (event) => {
                 try {
                     const data = JSON.parse(event.data);

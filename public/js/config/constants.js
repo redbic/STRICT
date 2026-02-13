@@ -3,6 +3,11 @@
 
 const CONFIG = {
   // ===================
+  // Debug
+  // ===================
+  DEBUG: typeof window !== 'undefined' && window.location.hostname === 'localhost',
+
+  // ===================
   // Validation (sync with server/validation.js)
   // ===================
   MAX_USERNAME_LENGTH: 32,
@@ -63,6 +68,16 @@ const CONFIG = {
   // ===================
   HEALTH_BAR_WIDTH: 36,
   HEALTH_BAR_HEIGHT: 5,
+
+  // ===================
+  // Zone Transitions
+  // ===================
+  ZONE_TRANSITION_GRACE_MS: 500,   // Grace period for enemy sync handoff
+
+  // ===================
+  // Speed Normalization
+  // ===================
+  SPEED_NORMALIZATION_FACTOR: 60,  // Divide velocity by this for network sync
 };
 
 // Make CONFIG available globally for non-module scripts
