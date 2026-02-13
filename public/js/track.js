@@ -176,12 +176,7 @@ class Zone {
             ctx.fill();
         }
 
-        // Draw portals as noir-style doors
-        this.portals.forEach(portal => {
-            if (this.isVisible(portal, cameraX, cameraY, ctx.canvas.width, ctx.canvas.height)) {
-                this.drawNoirDoor(ctx, portal, cameraX, cameraY);
-            }
-        });
+        // Portals are invisible - visual indicators placed via environment builder
 
         // Draw objects layer (furniture, decorations)
         if (this.objectsMap && typeof tilesetManager !== 'undefined' && tilesetManager && tilesetManager.loaded) {
