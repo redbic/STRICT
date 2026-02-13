@@ -246,9 +246,9 @@ class Game {
         vctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     }
     
-    init(zoneName, playerName, playerId, characterNum = null) {
-        // Load zone
-        const zoneData = ZONES[zoneName];
+    async init(zoneName, playerName, playerId, characterNum = null) {
+        // Load zone from JSON or fallback to ZONES
+        const zoneData = await ZoneLoader.getZone(zoneName);
         if (!zoneData) {
             console.error('Zone not found:', zoneName);
             return;
@@ -723,10 +723,10 @@ class Game {
         }
     }
 
-    transitionZone(zoneName, roster = [], localId = '') {
+    async transitionZone(zoneName, roster = [], localId = '') {
         const playerId = localId || (this.localPlayer ? this.localPlayer.id : '');
         const characterNum = this.localPlayer ? this.localPlayer.characterNum : this.localCharacter;
-        this.init(zoneName, this.localPlayer ? this.localPlayer.username : 'Player', playerId, characterNum);
+        await this.init(zoneName, this.localPlayer ? this.localPlayer.username : 'Player', playerId, characterNum);
         this.syncMultiplayerPlayers(roster, localId);
     }
 

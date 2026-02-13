@@ -714,14 +714,14 @@ function updatePlayersList(players) {
     });
 }
 
-function startGame(zoneName) {
+async function startGame(zoneName) {
     if (!game) {
         game = new Game();
     }
 
     const playerId = networkManager ? networkManager.playerId : 'player1';
     console.log('Starting game:', { zoneName, playerId, isHost: currentHostId === playerId, character: selectedCharacter });
-    game.init(zoneName, currentUsername, playerId, selectedCharacter);
+    await game.init(zoneName, currentUsername, playerId, selectedCharacter);
     game.onPortalEnter = (targetZoneId) => {
         if (networkManager && networkManager.connected) {
             networkManager.enterZone(targetZoneId);
