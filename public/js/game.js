@@ -260,20 +260,13 @@ class Game {
             this.physicsAccumulator = 0.2;
         }
 
-        // Run physics at fixed 60Hz
+        // Run physics at fixed 60Hz (movement only)
         while (this.physicsAccumulator >= this.PHYSICS_DT) {
             const dt = this.PHYSICS_DT;
 
-            // Update local player with fixed timestep
-            if (this.localPlayer) {
-                if (!this.localPlayer.isDead) {
-                    this.localPlayer.update(this.keys, this.zone, dt);
-                } else {
-                    this.localPlayer.updateGun(dt);
-                    if (this.localPlayer.damageFlashTimer > 0) {
-                        this.localPlayer.damageFlashTimer -= dt;
-                    }
-                }
+            // Update local player MOVEMENT with fixed timestep
+            if (this.localPlayer && !this.localPlayer.isDead) {
+                this.localPlayer.updateMovement(this.keys, this.zone, dt);
             }
 
             // Update enemies with fixed timestep (only if authoritative)
@@ -285,6 +278,14 @@ class Game {
             }
 
             this.physicsAccumulator -= this.PHYSICS_DT;
+        }
+
+        // Gun and timers use frame dt (not tied to physics rate)
+        if (this.localPlayer) {
+            this.localPlayer.updateGun(frameDt);
+            if (this.localPlayer.damageFlashTimer > 0) {
+                this.localPlayer.damageFlashTimer -= frameDt;
+            }
         }
 
         // Pickup collision check (once per frame is fine)

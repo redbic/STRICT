@@ -1,8 +1,8 @@
 // Player class for adventure character
 
 // Constants (time-based, units per second)
-const PLAYER_MAX_SPEED = 132;           // pixels per second (was 2.2 per frame * 60)
-const PLAYER_ACCELERATION = 800;        // pixels per second squared
+const PLAYER_MAX_SPEED = 264;           // pixels per second (doubled for faster gameplay)
+const PLAYER_ACCELERATION = 1600;       // pixels per second squared (doubled)
 const PLAYER_FRICTION = 8;              // friction factor (higher = more friction)
 const PLAYER_DEFAULT_HP = 100;
 const PLAYER_SIZE = 20;
@@ -83,12 +83,12 @@ class Player {
     }
     
     /**
-     * Update player physics and state
+     * Update player movement physics only (for fixed timestep)
      * @param {Object} keys - Current keyboard state
      * @param {Zone} zone - Current zone for collision detection
      * @param {number} dt - Delta time in seconds
      */
-    update(keys, zone, dt = 1/60) {
+    updateMovement(keys, zone, dt = 1/60) {
         // Handle stun effect
         if (this.stunned) {
             this.stunnedTime -= dt;
@@ -144,14 +144,6 @@ class Player {
             }
         }
 
-        // Update gun cooldowns
-        this.updateGun(dt);
-
-        // Update damage flash timer
-        if (this.damageFlashTimer > 0) {
-            this.damageFlashTimer -= dt;
-        }
-
         // Update speed for network sync (normalized to ~0-3 range for compatibility)
         this.speed = Math.hypot(this.velocityX, this.velocityY) / 60;
 
@@ -180,6 +172,20 @@ class Player {
         // Check area nodes
         if (zone) {
             zone.checkPlayerNode(this);
+        }
+    }
+
+    /**
+     * Update player physics and state (legacy method, calls updateMovement + updateGun)
+     * @param {Object} keys - Current keyboard state
+     * @param {Zone} zone - Current zone for collision detection
+     * @param {number} dt - Delta time in seconds
+     */
+    update(keys, zone, dt = 1/60) {
+        this.updateMovement(keys, zone, dt);
+        this.updateGun(dt);
+        if (this.damageFlashTimer > 0) {
+            this.damageFlashTimer -= dt;
         }
     }
     
