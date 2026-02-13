@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Environment Builder - LimeZu</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        .header {
+            background: #2a2a4a;
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            border-bottom: 1px solid #444;
+        }
+        .header h1 {
+            color: #b5a589;
+            font-size: 20px;
+        }
+        .header-controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        .header-controls label {
+            color: #888;
+            font-size: 12px;
+        }
+        .header-controls input, .header-controls select {
+            padding: 5px 8px;
+            background: #1a1a2e;
+            border: 1px solid #444;
+            color: #eee;
+            border-radius: 3px;
+            width: 60px;
+        }
+        .header-controls select { width: auto; }
+        .header-controls button {
+            padding: 8px 16px;
+            background: #4a7c4e;
+            border: none;
+            border-radius: 4px;
+            color: #fff;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .header-controls button:hover { background: #5a9c5e; }
+        .header-controls button.danger { background: #7c4a4a; }
+        .header-controls button.danger:hover { background: #9c5a5a; }
+
+        /* Main layout */
+        .main {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* Left panel - Tile palette */
+        .palette-panel {
+            width: 280px;
+            background: #252545;
+            border-right: 1px solid #444;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .palette-header {
+            padding: 10px;
+            border-bottom: 1px solid #444;
+        }
+        .palette-header h3 {
+            color: #b5a589;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+        .layer-tabs {
+            display: flex;
+            gap: 5px;
+        }
+        .layer-tab {
+            padding: 6px 12px;
+            background: #1a1a2e;
+            border: 1px solid #444;
+            border-radius: 3px;
+            color: #888;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .layer-tab.active {
+            background: #3a3a6a;
+            color: #fff;
+            border-color: #b5a589;
+        }
+        .tileset-select {
+            margin-top: 10px;
+        }
+        .tileset-select select {
+            width: 100%;
+            padding: 6px;
+            background: #1a1a2e;
+            border: 1px solid #444;
+            color: #eee;
+            border-radius: 3px;
+        }
+        .palette-tiles {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+        .palette-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(32px, 1fr));
+            gap: 2px;
+        }
+        .palette-tile {
+            width: 32px;
+            height: 32px;
+            border: 1px solid #333;
+            cursor: pointer;
+            image-rendering: pixelated;
+        }
+        .palette-tile:hover {
+            border-color: #ffcc00;
+        }
+        .palette-tile.selected {
+            border: 2px solid #00ff88;
+        }
+        .selected-preview {
+            padding: 10px;
+            border-top: 1px solid #444;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .selected-preview canvas {
+            image-rendering: pixelated;
+            border: 1px solid #444;
+        }
+        .selected-info {
+            font-size: 12px;
+            color: #888;
+        }
+
+        /* Center - Room canvas */
+        .canvas-panel {
+            flex: 1;
+            overflow: auto;
+            background: #111;
+            display: flex;
+            align-items: flex-start;
+            justify-content: flex-start;
+            padding: 20px;
+        }
+        .canvas-container {
+            position: relative;
+            border: 2px solid #444;
+        }
+        #roomCanvas {
+            display: block;
+            image-rendering: pixelated;
+            cursor: crosshair;
+        }
+        .grid-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+        }
+
+        /* Right panel - Export */
+        .export-panel {
+            width: 350px;
+            background: #252545;
+            border-left: 1px solid #444;
+            display: flex;
+            flex-direction: column;
+        }
+        .export-header {
+            padding: 10px;
+            border-bottom: 1px solid #444;
+        }
+        .export-header h3 {
+            color: #b5a589;
+            font-size: 14px;
+        }
+        .export-options {
+            padding: 10px;
+            border-bottom: 1px solid #444;
+        }
+        .export-options label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 8px;
+        }
+        .export-options input[type="text"] {
+            flex: 1;
+            padding: 5px;
+            background: #1a1a2e;
+            border: 1px solid #444;
+            color: #eee;
+            border-radius: 3px;
+        }
+        .export-content {
+            flex: 1;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        .export-code {
+            flex: 1;
+            background: #1a1a2e;
+            border: none;
+            color: #88ff88;
+            font-family: 'Consolas', monospace;
+            font-size: 11px;
+            padding: 10px;
+            resize: none;
+        }
+        .export-buttons {
+            padding: 10px;
+            display: flex;
+            gap: 10px;
+        }
+        .export-buttons button {
+            flex: 1;
+            padding: 10px;
+            background: #4a5a7c;
+            border: none;
+            border-radius: 4px;
+            color: #fff;
+            cursor: pointer;
+        }
+        .export-buttons button:hover { background: #5a6a9c; }
+        .export-buttons button.primary { background: #4a7c4e; }
+        .export-buttons button.primary:hover { background: #5a9c5e; }
+
+        /* Tools */
+        .tools-bar {
+            padding: 10px;
+            border-bottom: 1px solid #444;
+            display: flex;
+            gap: 5px;
+        }
+        .tool-btn {
+            padding: 8px 12px;
+            background: #1a1a2e;
+            border: 1px solid #444;
+            border-radius: 3px;
+            color: #888;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .tool-btn:hover { border-color: #666; }
+        .tool-btn.active {
+            background: #3a3a6a;
+            color: #fff;
+            border-color: #b5a589;
+        }
+
+        /* Wall tool options */
+        .wall-options {
+            padding: 10px;
+            border-bottom: 1px solid #444;
+            display: none;
+        }
+        .wall-options.visible { display: block; }
+        .wall-options label {
+            display: block;
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 5px;
+        }
+        .wall-options input {
+            width: 60px;
+            padding: 4px;
+            background: #1a1a2e;
+            border: 1px solid #444;
+            color: #eee;
+            border-radius: 3px;
+        }
+
+        /* Status bar */
+        .status-bar {
+            background: #2a2a4a;
+            padding: 5px 15px;
+            font-size: 12px;
+            color: #888;
+            border-top: 1px solid #444;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Environment Builder</h1>
+        <div class="header-controls">
+            <label>Width: <input type="number" id="roomWidth" value="20" min="5" max="100"></label>
+            <label>Height: <input type="number" id="roomHeight" value="15" min="5" max="100"></label>
+            <label>Tile Size:
+                <select id="tileDisplaySize">
+                    <option value="16">16px</option>
+                    <option value="24">24px</option>
+                    <option value="32" selected>32px</option>
+                    <option value="48">48px</option>
+                </select>
+            </label>
+            <button onclick="resizeRoom()">Apply Size</button>
+            <button class="danger" onclick="clearRoom()">Clear All</button>
+        </div>
+    </div>
+
+    <div class="main">
+        <!-- Left: Tile Palette -->
+        <div class="palette-panel">
+            <div class="palette-header">
+                <h3>Tiles</h3>
+                <div class="layer-tabs">
+                    <div class="layer-tab active" data-layer="floor">Floor</div>
+                    <div class="layer-tab" data-layer="walls">Walls</div>
+                    <div class="layer-tab" data-layer="objects">Objects</div>
+                </div>
+                <div class="tileset-select">
+                    <select id="tilesetSelect"></select>
+                </div>
+            </div>
+            <div class="tools-bar">
+                <button class="tool-btn active" data-tool="paint">Paint</button>
+                <button class="tool-btn" data-tool="fill">Fill</button>
+                <button class="tool-btn" data-tool="erase">Erase</button>
+            </div>
+            <div class="wall-options" id="wallOptions">
+                <label>Wall Thickness: <input type="number" id="wallThickness" value="50" min="10" max="200"> px</label>
+            </div>
+            <div class="palette-tiles">
+                <div class="palette-grid" id="paletteGrid"></div>
+            </div>
+            <div class="selected-preview">
+                <canvas id="selectedTilePreview" width="48" height="48"></canvas>
+                <div class="selected-info" id="selectedInfo">No tile selected</div>
+            </div>
+        </div>
+
+        <!-- Center: Room Canvas -->
+        <div class="canvas-panel">
+            <div class="canvas-container">
+                <canvas id="roomCanvas"></canvas>
+                <canvas class="grid-overlay" id="gridOverlay"></canvas>
+            </div>
+        </div>
+
+        <!-- Right: Export -->
+        <div class="export-panel">
+            <div class="export-header">
+                <h3>Export</h3>
+            </div>
+            <div class="export-options">
+                <label>Zone Name: <input type="text" id="zoneName" value="myZone"></label>
+                <label>
+                    <input type="checkbox" id="includeWalls" checked> Include walls
+                </label>
+                <label>
+                    <input type="checkbox" id="includeFloor" checked> Include floor tiles
+                </label>
+            </div>
+            <div class="export-content">
+                <textarea class="export-code" id="exportCode" readonly>// Place tiles to generate code</textarea>
+            </div>
+            <div class="export-buttons">
+                <button onclick="copyExport()">Copy Code</button>
+                <button class="primary" onclick="updateExport()">Refresh</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="status-bar" id="statusBar">Ready - Click tiles to place</div>
+
+    <script>
+        // Tilesets configuration
+        const TILESETS = {
+            floors: { path: '/assets/tiles/Room_Builder_Floors_16x16.png', name: 'Floors' },
+            walls: { path: '/assets/tiles/Room_Builder_Walls_16x16.png', name: 'Walls' },
+            walls3d: { path: '/assets/tiles/Room_Builder_3d_walls_16x16.png', name: '3D Walls' },
+            t01_generic: { path: '/assets/tiles/1_Generic_16x16.png', name: 'Generic' },
+            t02_livingRoom: { path: '/assets/tiles/2_LivingRoom_16x16.png', name: 'Living Room' },
+            t03_bathroom: { path: '/assets/tiles/3_Bathroom_16x16.png', name: 'Bathroom' },
+            t04_bedroom: { path: '/assets/tiles/4_Bedroom_16x16.png', name: 'Bedroom' },
+            t12_kitchen: { path: '/assets/tiles/12_Kitchen_16x16.png', name: 'Kitchen' },
+            t13_conference: { path: '/assets/tiles/13_Conference_Hall_16x16.png', name: 'Conference' },
+            t16_grocery: { path: '/assets/tiles/16_Grocery_store_16x16.png', name: 'Grocery' },
+            t19_hospital: { path: '/assets/tiles/19_Hospital_16x16.png', name: 'Hospital' },
+        };
+
+        const TILE_SIZE = 16; // Source tile size
+        let displayTileSize = 32; // Display size
+        let roomWidth = 20;
+        let roomHeight = 15;
+        let currentLayer = 'floor';
+        let currentTool = 'paint';
+        let currentTileset = 'floors';
+        let selectedTile = null;
+        let tilesetImages = {};
+        let isDrawing = false;
+
+        // Room data
+        let roomData = {
+            floor: {},    // { "x,y": { tileset, tileX, tileY } }
+            walls: [],    // [{ x, y, width, height }]
+            objects: {}   // { "x,y": { tileset, tileX, tileY } }
+        };
+
+        // Wall drawing state
+        let wallStart = null;
+
+        const canvas = document.getElementById('roomCanvas');
+        const ctx = canvas.getContext('2d');
+        const gridCanvas = document.getElementById('gridOverlay');
+        const gridCtx = gridCanvas.getContext('2d');
+
+        // Initialize
+        async function init() {
+            // Populate tileset dropdown
+            const select = document.getElementById('tilesetSelect');
+            for (const [key, ts] of Object.entries(TILESETS)) {
+                const opt = document.createElement('option');
+                opt.value = key;
+                opt.textContent = ts.name;
+                select.appendChild(opt);
+            }
+
+            // Load initial tileset
+            await loadTileset('floors');
+            resizeRoom();
+
+            // Event listeners
+            select.addEventListener('change', (e) => loadTileset(e.target.value));
+
+            document.querySelectorAll('.layer-tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('.layer-tab').forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    currentLayer = tab.dataset.layer;
+                    document.getElementById('wallOptions').classList.toggle('visible', currentLayer === 'walls');
+                    updateStatus();
+                });
+            });
+
+            document.querySelectorAll('.tool-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentTool = btn.dataset.tool;
+                    updateStatus();
+                });
+            });
+
+            // Canvas events
+            canvas.addEventListener('mousedown', onCanvasMouseDown);
+            canvas.addEventListener('mousemove', onCanvasMouseMove);
+            canvas.addEventListener('mouseup', onCanvasMouseUp);
+            canvas.addEventListener('mouseleave', onCanvasMouseUp);
+            canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+            document.getElementById('tileDisplaySize').addEventListener('change', (e) => {
+                displayTileSize = parseInt(e.target.value);
+                resizeRoom();
+            });
+
+            updateStatus();
+        }
+
+        async function loadTileset(key) {
+            currentTileset = key;
+            const ts = TILESETS[key];
+            if (!ts) return;
+
+            if (!tilesetImages[key]) {
+                const img = new Image();
+                await new Promise((resolve) => {
+                    img.onload = resolve;
+                    img.onerror = resolve;
+                    img.src = ts.path;
+                });
+                tilesetImages[key] = img;
+            }
+
+            renderPalette();
+        }
+
+        function renderPalette() {
+            const grid = document.getElementById('paletteGrid');
+            grid.innerHTML = '';
+
+            const img = tilesetImages[currentTileset];
+            if (!img) return;
+
+            const cols = Math.floor(img.width / TILE_SIZE);
+            const rows = Math.floor(img.height / TILE_SIZE);
+
+            for (let y = 0; y < rows; y++) {
+                for (let x = 0; x < cols; x++) {
+                    const tileCanvas = document.createElement('canvas');
+                    tileCanvas.width = 32;
+                    tileCanvas.height = 32;
+                    tileCanvas.className = 'palette-tile';
+                    tileCanvas.dataset.tileX = x;
+                    tileCanvas.dataset.tileY = y;
+
+                    const tileCtx = tileCanvas.getContext('2d');
+                    tileCtx.imageSmoothingEnabled = false;
+                    tileCtx.drawImage(img, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE, 0, 0, 32, 32);
+
+                    tileCanvas.addEventListener('click', () => selectTile(x, y, tileCanvas));
+                    grid.appendChild(tileCanvas);
+                }
+            }
+        }
+
+        function selectTile(tileX, tileY, element) {
+            document.querySelectorAll('.palette-tile').forEach(t => t.classList.remove('selected'));
+            element.classList.add('selected');
+
+            selectedTile = { tileset: currentTileset, tileX, tileY };
+
+            // Update preview
+            const preview = document.getElementById('selectedTilePreview');
+            const pCtx = preview.getContext('2d');
+            pCtx.imageSmoothingEnabled = false;
+            pCtx.clearRect(0, 0, 48, 48);
+
+            const img = tilesetImages[currentTileset];
+            if (img) {
+                pCtx.drawImage(img, tileX * TILE_SIZE, tileY * TILE_SIZE, TILE_SIZE, TILE_SIZE, 0, 0, 48, 48);
+            }
+
+            document.getElementById('selectedInfo').textContent = `${currentTileset} (${tileX}, ${tileY})`;
+            updateStatus();
+        }
+
+        function resizeRoom() {
+            roomWidth = parseInt(document.getElementById('roomWidth').value) || 20;
+            roomHeight = parseInt(document.getElementById('roomHeight').value) || 15;
+            displayTileSize = parseInt(document.getElementById('tileDisplaySize').value) || 32;
+
+            canvas.width = roomWidth * displayTileSize;
+            canvas.height = roomHeight * displayTileSize;
+            gridCanvas.width = canvas.width;
+            gridCanvas.height = canvas.height;
+
+            renderRoom();
+            renderGrid();
+            updateExport();
+        }
+
+        function renderRoom() {
+            ctx.imageSmoothingEnabled = false;
+            ctx.fillStyle = '#2a2a2a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw floor tiles
+            for (const [key, tile] of Object.entries(roomData.floor)) {
+                const [x, y] = key.split(',').map(Number);
+                drawTileAt(tile, x, y);
+            }
+
+            // Draw objects
+            for (const [key, tile] of Object.entries(roomData.objects)) {
+                const [x, y] = key.split(',').map(Number);
+                drawTileAt(tile, x, y);
+            }
+
+            // Draw walls
+            ctx.fillStyle = 'rgba(139, 115, 85, 0.8)';
+            ctx.strokeStyle = '#6b5344';
+            ctx.lineWidth = 2;
+            for (const wall of roomData.walls) {
+                const sx = (wall.x / (roomWidth * TILE_SIZE * 3)) * canvas.width;
+                const sy = (wall.y / (roomHeight * TILE_SIZE * 3)) * canvas.height;
+                const sw = (wall.width / (roomWidth * TILE_SIZE * 3)) * canvas.width;
+                const sh = (wall.height / (roomHeight * TILE_SIZE * 3)) * canvas.height;
+                ctx.fillRect(sx, sy, sw, sh);
+                ctx.strokeRect(sx, sy, sw, sh);
+            }
+        }
+
+        function drawTileAt(tile, gridX, gridY) {
+            const img = tilesetImages[tile.tileset];
+            if (!img) return;
+
+            ctx.drawImage(
+                img,
+                tile.tileX * TILE_SIZE, tile.tileY * TILE_SIZE, TILE_SIZE, TILE_SIZE,
+                gridX * displayTileSize, gridY * displayTileSize, displayTileSize, displayTileSize
+            );
+        }
+
+        function renderGrid() {
+            gridCtx.clearRect(0, 0, gridCanvas.width, gridCanvas.height);
+            gridCtx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+            gridCtx.lineWidth = 1;
+
+            for (let x = 0; x <= roomWidth; x++) {
+                gridCtx.beginPath();
+                gridCtx.moveTo(x * displayTileSize + 0.5, 0);
+                gridCtx.lineTo(x * displayTileSize + 0.5, gridCanvas.height);
+                gridCtx.stroke();
+            }
+
+            for (let y = 0; y <= roomHeight; y++) {
+                gridCtx.beginPath();
+                gridCtx.moveTo(0, y * displayTileSize + 0.5);
+                gridCtx.lineTo(gridCanvas.width, y * displayTileSize + 0.5);
+                gridCtx.stroke();
+            }
+        }
+
+        function getGridPos(e) {
+            const rect = canvas.getBoundingClientRect();
+            const x = Math.floor((e.clientX - rect.left) / displayTileSize);
+            const y = Math.floor((e.clientY - rect.top) / displayTileSize);
+            return { x: Math.max(0, Math.min(x, roomWidth - 1)), y: Math.max(0, Math.min(y, roomHeight - 1)) };
+        }
+
+        function getWorldPos(e) {
+            const rect = canvas.getBoundingClientRect();
+            const scale = (roomWidth * TILE_SIZE * 3) / canvas.width;
+            return {
+                x: Math.round((e.clientX - rect.left) * scale),
+                y: Math.round((e.clientY - rect.top) * scale)
+            };
+        }
+
+        function onCanvasMouseDown(e) {
+            if (currentLayer === 'walls') {
+                wallStart = getWorldPos(e);
+                isDrawing = true;
+            } else {
+                isDrawing = true;
+                placeTile(e);
+            }
+        }
+
+        function onCanvasMouseMove(e) {
+            const pos = getGridPos(e);
+            document.getElementById('statusBar').textContent =
+                `Position: (${pos.x}, ${pos.y}) | Layer: ${currentLayer} | Tool: ${currentTool}`;
+
+            if (isDrawing && currentLayer !== 'walls') {
+                placeTile(e);
+            }
+        }
+
+        function onCanvasMouseUp(e) {
+            if (currentLayer === 'walls' && wallStart && isDrawing) {
+                const wallEnd = getWorldPos(e);
+                const thickness = parseInt(document.getElementById('wallThickness').value) || 50;
+
+                const x = Math.min(wallStart.x, wallEnd.x);
+                const y = Math.min(wallStart.y, wallEnd.y);
+                const width = Math.max(thickness, Math.abs(wallEnd.x - wallStart.x));
+                const height = Math.max(thickness, Math.abs(wallEnd.y - wallStart.y));
+
+                if (currentTool === 'erase') {
+                    // Find and remove wall at position
+                    roomData.walls = roomData.walls.filter(w => {
+                        const wx = (w.x / (roomWidth * TILE_SIZE * 3)) * canvas.width;
+                        const wy = (w.y / (roomHeight * TILE_SIZE * 3)) * canvas.height;
+                        const ww = (w.width / (roomWidth * TILE_SIZE * 3)) * canvas.width;
+                        const wh = (w.height / (roomHeight * TILE_SIZE * 3)) * canvas.height;
+                        const rect = canvas.getBoundingClientRect();
+                        const mx = e.clientX - rect.left;
+                        const my = e.clientY - rect.top;
+                        return !(mx >= wx && mx <= wx + ww && my >= wy && my <= wy + wh);
+                    });
+                } else {
+                    roomData.walls.push({ x, y, width, height });
+                }
+
+                wallStart = null;
+                renderRoom();
+                updateExport();
+            }
+            isDrawing = false;
+        }
+
+        function placeTile(e) {
+            const pos = getGridPos(e);
+            const key = `${pos.x},${pos.y}`;
+            const layer = currentLayer === 'walls' ? 'objects' : currentLayer;
+
+            if (currentTool === 'erase') {
+                delete roomData[layer][key];
+            } else if (currentTool === 'fill' && selectedTile) {
+                // Fill entire layer
+                for (let y = 0; y < roomHeight; y++) {
+                    for (let x = 0; x < roomWidth; x++) {
+                        roomData[layer][`${x},${y}`] = { ...selectedTile };
+                    }
+                }
+            } else if (selectedTile) {
+                roomData[layer][key] = { ...selectedTile };
+            }
+
+            renderRoom();
+            updateExport();
+        }
+
+        function clearRoom() {
+            if (!confirm('Clear all tiles and walls?')) return;
+            roomData = { floor: {}, walls: [], objects: {} };
+            renderRoom();
+            updateExport();
+        }
+
+        function updateExport() {
+            const zoneName = document.getElementById('zoneName').value || 'myZone';
+            const includeWalls = document.getElementById('includeWalls').checked;
+            const includeFloor = document.getElementById('includeFloor').checked;
+
+            const worldWidth = roomWidth * TILE_SIZE * 3;  // 48px per tile at 3x scale
+            const worldHeight = roomHeight * TILE_SIZE * 3;
+
+            let code = `// Zone: ${zoneName}\n`;
+            code += `// Size: ${roomWidth}x${roomHeight} tiles (${worldWidth}x${worldHeight} world units)\n\n`;
+
+            // Floor pattern
+            if (includeFloor && Object.keys(roomData.floor).length > 0) {
+                code += `const ${zoneName.toUpperCase()}_FLOOR = {\n`;
+                code += `    width: ${roomWidth},\n`;
+                code += `    height: ${roomHeight},\n`;
+                code += `    tiles: [\n`;
+
+                for (const [key, tile] of Object.entries(roomData.floor)) {
+                    const [x, y] = key.split(',');
+                    code += `        { x: ${x}, y: ${y}, tileset: '${tile.tileset}', tileX: ${tile.tileX}, tileY: ${tile.tileY} },\n`;
+                }
+                code += `    ]\n};\n\n`;
+            }
+
+            // Walls
+            if (includeWalls && roomData.walls.length > 0) {
+                code += `const ${zoneName.toUpperCase()}_WALLS = [\n`;
+                for (const wall of roomData.walls) {
+                    code += `    { x: ${wall.x}, y: ${wall.y}, width: ${wall.width}, height: ${wall.height} },\n`;
+                }
+                code += `];\n\n`;
+            }
+
+            // Zone definition snippet
+            code += `// Add to ZONES object:\n`;
+            code += `${zoneName}: {\n`;
+            code += `    name: '${zoneName}',\n`;
+            code += `    width: ${worldWidth},\n`;
+            code += `    height: ${worldHeight},\n`;
+            code += `    startX: ${Math.floor(worldWidth / 2)},\n`;
+            code += `    startY: ${Math.floor(worldHeight / 2)},\n`;
+            if (includeWalls && roomData.walls.length > 0) {
+                code += `    walls: ${zoneName.toUpperCase()}_WALLS,\n`;
+            }
+            code += `    portals: [],\n`;
+            code += `    npcs: []\n`;
+            code += `}\n`;
+
+            document.getElementById('exportCode').value = code;
+        }
+
+        function copyExport() {
+            const code = document.getElementById('exportCode').value;
+            navigator.clipboard.writeText(code).then(() => {
+                document.getElementById('statusBar').textContent = 'Code copied to clipboard!';
+                setTimeout(updateStatus, 2000);
+            });
+        }
+
+        function updateStatus() {
+            const tileInfo = selectedTile ? `${selectedTile.tileset} (${selectedTile.tileX}, ${selectedTile.tileY})` : 'none';
+            document.getElementById('statusBar').textContent =
+                `Layer: ${currentLayer} | Tool: ${currentTool} | Selected: ${tileInfo}`;
+        }
+
+        // Start
+        init();
+    </script>
+</body>
+</html>
