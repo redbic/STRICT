@@ -155,22 +155,26 @@ class Player {
         const oldX = this.x;
         const oldY = this.y;
 
-        // Update position (time-based)
+        // Update X position first, check collision separately for wall sliding
         this.x += this.velocityX * dt;
-        this.y += this.velocityY * dt;
-
-        // Clamp to zone bounds
         if (zone) {
             const halfW = this.width / 2;
-            const halfH = this.height / 2;
             this.x = Math.max(halfW, Math.min(zone.width - halfW, this.x));
-            this.y = Math.max(halfH, Math.min(zone.height - halfH, this.y));
+            if (zone.checkCollision(this)) {
+                this.x = oldX;
+                this.velocityX = 0;
+            }
         }
 
-        // Check area collision
-        if (zone && zone.checkCollision(this)) {
-            this.x = oldX;
-            this.y = oldY;
+        // Update Y position, check collision separately
+        this.y += this.velocityY * dt;
+        if (zone) {
+            const halfH = this.height / 2;
+            this.y = Math.max(halfH, Math.min(zone.height - halfH, this.y));
+            if (zone.checkCollision(this)) {
+                this.y = oldY;
+                this.velocityY = 0;
+            }
         }
 
         // Check area nodes
