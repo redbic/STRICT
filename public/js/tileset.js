@@ -54,7 +54,8 @@ class TilesetManager {
     }
 
     // Draw a single tile from a tileset
-    drawTile(ctx, tilesetName, tileX, tileY, destX, destY, scale = this.scale) {
+    // flipH: flip horizontally, flipV: flip vertically
+    drawTile(ctx, tilesetName, tileX, tileY, destX, destY, scale = this.scale, flipH = false, flipV = false) {
         const tileset = this.tilesets.get(tilesetName);
         if (!tileset) return;
 
@@ -63,11 +64,25 @@ class TilesetManager {
         const destSize = this.tileSize * scale;
 
         ctx.imageSmoothingEnabled = false; // Pixel-perfect scaling
-        ctx.drawImage(
-            tileset.image,
-            srcX, srcY, this.tileSize, this.tileSize,
-            destX, destY, destSize, destSize
-        );
+
+        if (flipH || flipV) {
+            ctx.save();
+            // Move to center of tile, flip, then draw offset
+            ctx.translate(destX + destSize / 2, destY + destSize / 2);
+            ctx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
+            ctx.drawImage(
+                tileset.image,
+                srcX, srcY, this.tileSize, this.tileSize,
+                -destSize / 2, -destSize / 2, destSize, destSize
+            );
+            ctx.restore();
+        } else {
+            ctx.drawImage(
+                tileset.image,
+                srcX, srcY, this.tileSize, this.tileSize,
+                destX, destY, destSize, destSize
+            );
+        }
     }
 
     // Draw a tile by index (left-to-right, top-to-bottom)

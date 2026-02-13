@@ -370,6 +370,9 @@
                 <button class="tool-btn active" data-tool="paint">Paint</button>
                 <button class="tool-btn" data-tool="fill">Fill</button>
                 <button class="tool-btn" data-tool="erase">Erase</button>
+                <span style="color:#444;margin:0 5px;">|</span>
+                <button class="tool-btn" id="flipHBtn" title="Flip Horizontal">FlipH</button>
+                <button class="tool-btn" id="flipVBtn" title="Flip Vertical">FlipV</button>
             </div>
             <div class="wall-options" id="wallOptions">
                 <label>Wall Thickness: <input type="number" id="wallThickness" value="50" min="10" max="200"> px</label>
@@ -475,12 +478,14 @@
         let selectedTile = null;
         let tilesetImages = {};
         let isDrawing = false;
+        let flipH = false;  // Horizontal flip
+        let flipV = false;  // Vertical flip
 
         // Room data
         let roomData = {
-            floor: {},    // { "x,y": { tileset, tileX, tileY } }
+            floor: {},    // { "x,y": { tileset, tileX, tileY, flipH, flipV } }
             walls: [],    // [{ x, y, width, height }]
-            objects: {}   // { "x,y": { tileset, tileX, tileY } }
+            objects: {}   // { "x,y": { tileset, tileX, tileY, flipH, flipV } }
         };
 
         // Wall drawing state
@@ -519,13 +524,27 @@
                 });
             });
 
-            document.querySelectorAll('.tool-btn').forEach(btn => {
+            document.querySelectorAll('.tool-btn[data-tool]').forEach(btn => {
                 btn.addEventListener('click', () => {
-                    document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+                    document.querySelectorAll('.tool-btn[data-tool]').forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
                     currentTool = btn.dataset.tool;
                     updateStatus();
                 });
+            });
+
+            // Flip toggle buttons
+            document.getElementById('flipHBtn').addEventListener('click', (e) => {
+                flipH = !flipH;
+                e.target.classList.toggle('active', flipH);
+                updatePreview();
+                updateStatus();
+            });
+            document.getElementById('flipVBtn').addEventListener('click', (e) => {
+                flipV = !flipV;
+                e.target.classList.toggle('active', flipV);
+                updatePreview();
+                updateStatus();
             });
 
             // Room canvas events
@@ -666,21 +685,34 @@
 
         function selectTile(tileX, tileY) {
             selectedTile = { tileset: currentTileset, tileX, tileY };
+            updatePreview();
+            updateSelectedHighlight();
+            updateStatus();
+        }
 
-            // Update preview
+        function updatePreview() {
+            if (!selectedTile) return;
+
             const preview = document.getElementById('selectedTilePreview');
             const pCtx = preview.getContext('2d');
             pCtx.imageSmoothingEnabled = false;
             pCtx.clearRect(0, 0, 48, 48);
 
-            const img = tilesetImages[currentTileset];
+            const img = tilesetImages[selectedTile.tileset];
             if (img) {
-                pCtx.drawImage(img, tileX * TILE_SIZE, tileY * TILE_SIZE, TILE_SIZE, TILE_SIZE, 0, 0, 48, 48);
+                pCtx.save();
+                if (flipH || flipV) {
+                    pCtx.translate(24, 24);
+                    pCtx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
+                    pCtx.drawImage(img, selectedTile.tileX * TILE_SIZE, selectedTile.tileY * TILE_SIZE, TILE_SIZE, TILE_SIZE, -24, -24, 48, 48);
+                } else {
+                    pCtx.drawImage(img, selectedTile.tileX * TILE_SIZE, selectedTile.tileY * TILE_SIZE, TILE_SIZE, TILE_SIZE, 0, 0, 48, 48);
+                }
+                pCtx.restore();
             }
 
-            document.getElementById('selectedInfo').innerHTML = `<strong>${currentTileset}</strong><br>tileX: ${tileX}, tileY: ${tileY}`;
-            updateSelectedHighlight();
-            updateStatus();
+            const flipText = (flipH || flipV) ? ` [${flipH ? 'H' : ''}${flipV ? 'V' : ''}]` : '';
+            document.getElementById('selectedInfo').innerHTML = `<strong>${selectedTile.tileset}</strong><br>tileX: ${selectedTile.tileX}, tileY: ${selectedTile.tileY}${flipText}`;
         }
 
         function resizeRoom() {
@@ -733,11 +765,26 @@
             const img = tilesetImages[tile.tileset];
             if (!img) return;
 
-            ctx.drawImage(
-                img,
-                tile.tileX * TILE_SIZE, tile.tileY * TILE_SIZE, TILE_SIZE, TILE_SIZE,
-                gridX * displayTileSize, gridY * displayTileSize, displayTileSize, displayTileSize
-            );
+            const destX = gridX * displayTileSize;
+            const destY = gridY * displayTileSize;
+
+            if (tile.flipH || tile.flipV) {
+                ctx.save();
+                ctx.translate(destX + displayTileSize / 2, destY + displayTileSize / 2);
+                ctx.scale(tile.flipH ? -1 : 1, tile.flipV ? -1 : 1);
+                ctx.drawImage(
+                    img,
+                    tile.tileX * TILE_SIZE, tile.tileY * TILE_SIZE, TILE_SIZE, TILE_SIZE,
+                    -displayTileSize / 2, -displayTileSize / 2, displayTileSize, displayTileSize
+                );
+                ctx.restore();
+            } else {
+                ctx.drawImage(
+                    img,
+                    tile.tileX * TILE_SIZE, tile.tileY * TILE_SIZE, TILE_SIZE, TILE_SIZE,
+                    destX, destY, displayTileSize, displayTileSize
+                );
+            }
         }
 
         function renderGrid() {
@@ -840,11 +887,11 @@
                 // Fill entire layer
                 for (let y = 0; y < roomHeight; y++) {
                     for (let x = 0; x < roomWidth; x++) {
-                        roomData[layer][`${x},${y}`] = { ...selectedTile };
+                        roomData[layer][`${x},${y}`] = { ...selectedTile, flipH, flipV };
                     }
                 }
             } else if (selectedTile) {
-                roomData[layer][key] = { ...selectedTile };
+                roomData[layer][key] = { ...selectedTile, flipH, flipV };
             }
 
             renderRoom();
@@ -878,7 +925,11 @@
 
                 for (const [key, tile] of Object.entries(roomData.floor)) {
                     const [x, y] = key.split(',');
-                    code += `        { x: ${x}, y: ${y}, tileset: '${tile.tileset}', tileX: ${tile.tileX}, tileY: ${tile.tileY} },\n`;
+                    let tileCode = `        { x: ${x}, y: ${y}, tileset: '${tile.tileset}', tileX: ${tile.tileX}, tileY: ${tile.tileY}`;
+                    if (tile.flipH) tileCode += `, flipH: true`;
+                    if (tile.flipV) tileCode += `, flipV: true`;
+                    tileCode += ` },\n`;
+                    code += tileCode;
                 }
                 code += `    ]\n};\n\n`;
             }
@@ -920,8 +971,9 @@
 
         function updateStatus() {
             const tileInfo = selectedTile ? `${selectedTile.tileset} (${selectedTile.tileX}, ${selectedTile.tileY})` : 'none';
+            const flipInfo = (flipH || flipV) ? ` | Flip: ${flipH ? 'H' : ''}${flipV ? 'V' : ''}` : '';
             document.getElementById('statusBar').textContent =
-                `Layer: ${currentLayer} | Tool: ${currentTool} | Selected: ${tileInfo}`;
+                `Layer: ${currentLayer} | Tool: ${currentTool} | Selected: ${tileInfo}${flipInfo}`;
         }
 
         // Start

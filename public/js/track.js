@@ -208,11 +208,10 @@ class Zone {
      * Draw floor using LimeZu tileset
      */
     drawTilesetFloor(ctx, cameraX, cameraY) {
-        // Lobby floor tiles - 3x2 repeating pattern
-        const lobbyFloorTiles = [
-            // Row 0 (top)
+        // Lobby floor tiles - 6x4 repeating pattern with mirroring
+        // Base tiles (top-left corner with borders on left/top)
+        const baseTiles = [
             [{ tileset: 'floors', tileX: 8, tileY: 2 }, { tileset: 'floors', tileX: 9, tileY: 2 }, { tileset: 'floors', tileX: 10, tileY: 2 }],
-            // Row 1 (bottom)
             [{ tileset: 'floors', tileX: 8, tileY: 3 }, { tileset: 'floors', tileX: 9, tileY: 3 }, { tileset: 'floors', tileX: 10, tileY: 3 }]
         ];
 
@@ -244,25 +243,45 @@ class Zone {
                 const screenX = worldTileX * tileSize - cameraX;
                 const screenY = worldTileY * tileSize - cameraY;
 
-                let floorTile;
                 if (this.isHub) {
-                    // Use 3x2 repeating pattern for lobby
-                    const patternX = ((worldTileX % 3) + 3) % 3; // Handle negative coords
-                    const patternY = ((worldTileY % 2) + 2) % 2;
-                    floorTile = lobbyFloorTiles[patternY][patternX];
-                } else {
-                    floorTile = otherFloorTile;
-                }
+                    // 6x4 pattern: original 3x2 + mirrored versions
+                    // Pattern repeats every 6 tiles horizontally (3 + 3 flipped)
+                    // Pattern repeats every 4 tiles vertically (2 + 2 flipped)
+                    const patternX6 = ((worldTileX % 6) + 6) % 6;
+                    const patternY4 = ((worldTileY % 4) + 4) % 4;
 
-                tilesetManager.drawTile(
-                    ctx,
-                    floorTile.tileset,
-                    floorTile.tileX,
-                    floorTile.tileY,
-                    screenX,
-                    screenY,
-                    scale
-                );
+                    // Determine which quadrant and flip flags
+                    const flipH = patternX6 >= 3;
+                    const flipV = patternY4 >= 2;
+
+                    // Map to base tile (0-2 for x, 0-1 for y)
+                    const baseX = flipH ? (5 - patternX6) : patternX6;
+                    const baseY = flipV ? (3 - patternY4) : patternY4;
+
+                    const floorTile = baseTiles[baseY][baseX];
+
+                    tilesetManager.drawTile(
+                        ctx,
+                        floorTile.tileset,
+                        floorTile.tileX,
+                        floorTile.tileY,
+                        screenX,
+                        screenY,
+                        scale,
+                        flipH,
+                        flipV
+                    );
+                } else {
+                    tilesetManager.drawTile(
+                        ctx,
+                        otherFloorTile.tileset,
+                        otherFloorTile.tileX,
+                        otherFloorTile.tileY,
+                        screenX,
+                        screenY,
+                        scale
+                    );
+                }
             }
         }
     }
