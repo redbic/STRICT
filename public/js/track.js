@@ -208,11 +208,16 @@ class Zone {
      * Draw floor using LimeZu tileset
      */
     drawTilesetFloor(ctx, cameraX, cameraY) {
-        // Choose floor tile based on zone (could be configured per zone)
-        // Using beige carpet for lobby, green for rooms
-        const floorTile = this.isHub
-            ? { tileset: 'floors', tileX: 1, tileY: 4 }  // Beige carpet
-            : { tileset: 'floors', tileX: 4, tileY: 4 }; // Different carpet
+        // Lobby floor tiles - 3x2 repeating pattern
+        const lobbyFloorTiles = [
+            // Row 0 (top)
+            [{ tileset: 'floors', tileX: 8, tileY: 2 }, { tileset: 'floors', tileX: 9, tileY: 2 }, { tileset: 'floors', tileX: 10, tileY: 2 }],
+            // Row 1 (bottom)
+            [{ tileset: 'floors', tileX: 8, tileY: 3 }, { tileset: 'floors', tileX: 9, tileY: 3 }, { tileset: 'floors', tileX: 10, tileY: 3 }]
+        ];
+
+        // Other zones use simple carpet
+        const otherFloorTile = { tileset: 'floors', tileX: 4, tileY: 4 };
 
         const scale = tilesetManager.scale;
         const tileSize = tilesetManager.tileSize * scale; // 48px
@@ -238,6 +243,16 @@ class Zone {
 
                 const screenX = worldTileX * tileSize - cameraX;
                 const screenY = worldTileY * tileSize - cameraY;
+
+                let floorTile;
+                if (this.isHub) {
+                    // Use 3x2 repeating pattern for lobby
+                    const patternX = ((worldTileX % 3) + 3) % 3; // Handle negative coords
+                    const patternY = ((worldTileY % 2) + 2) % 2;
+                    floorTile = lobbyFloorTiles[patternY][patternX];
+                } else {
+                    floorTile = otherFloorTile;
+                }
 
                 tilesetManager.drawTile(
                     ctx,
