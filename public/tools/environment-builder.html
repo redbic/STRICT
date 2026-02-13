@@ -403,12 +403,21 @@
             <button onclick="resizeRoom()">Apply Size</button>
             <select id="existingRooms" onchange="loadExistingRoom(this.value)">
                 <option value="">-- Load Existing --</option>
-                <option value="hub">Hub Lobby</option>
-                <option value="training">Training Room</option>
-                <option value="elevator">Elevator</option>
+                <optgroup label="Hardcoded">
+                    <option value="hub">Hub Lobby</option>
+                    <option value="training">Training Room</option>
+                    <option value="elevator">Elevator</option>
+                </optgroup>
+                <optgroup label="Server Zones" id="serverZonesGroup">
+                </optgroup>
             </select>
+            <button onclick="refreshServerZones()" title="Refresh server zones list">↻</button>
             <button onclick="showLoadModal()">Import Code</button>
             <button class="danger" onclick="clearRoom()">Clear All</button>
+            <span style="margin-left:20px;border-left:1px solid #555;padding-left:20px;">
+                <input type="text" id="zoneId" placeholder="zone-name" style="width:100px;" value="my-zone">
+                <button onclick="saveToServer()" style="background:#4a7c4e;">Save to Server</button>
+            </span>
         </div>
     </div>
 
@@ -670,6 +679,9 @@ const MYZONE_FLOOR = {
                 paletteScale = parseInt(e.target.value);
                 renderPalette();
             });
+
+            // Load server zones list
+            refreshServerZones();
 
             updateStatus();
         }
@@ -1274,12 +1286,19 @@ const MYZONE_FLOOR = {
             }
         });
 
-        // Load existing room from predefined data
+        // Load existing room from predefined data or server
         async function loadExistingRoom(roomId) {
             if (!roomId) return;
 
             // Reset dropdown
             document.getElementById('existingRooms').value = '';
+
+            // Check if it's a server zone
+            if (roomId.startsWith('server:')) {
+                const zoneId = roomId.substring(7);
+                await loadServerZone(zoneId);
+                return;
+            }
 
             // Fetch room data from track.js definitions
             const roomDefs = await fetchExistingRooms();
@@ -1446,6 +1465,198 @@ const MYZONE_FLOOR = {
                     ]
                 }
             };
+        }
+
+        // Refresh server zones list
+        async function refreshServerZones() {
+            const group = document.getElementById('serverZonesGroup');
+            group.innerHTML = '<option value="" disabled>Loading...</option>';
+
+            try {
+                const response = await fetch('/api/zones');
+                if (response.ok) {
+                    const zones = await response.json();
+                    group.innerHTML = '';
+                    if (zones.length === 0) {
+                        group.innerHTML = '<option value="" disabled>No saved zones</option>';
+                    } else {
+                        zones.forEach(zone => {
+                            const opt = document.createElement('option');
+                            opt.value = 'server:' + zone;
+                            opt.textContent = zone;
+                            group.appendChild(opt);
+                        });
+                    }
+                } else {
+                    group.innerHTML = '<option value="" disabled>Failed to load</option>';
+                }
+            } catch (err) {
+                group.innerHTML = '<option value="" disabled>Error loading zones</option>';
+            }
+        }
+
+        // Load zone from server
+        async function loadServerZone(zoneId) {
+            document.getElementById('statusBar').textContent = 'Loading zone from server...';
+
+            try {
+                const response = await fetch(`/api/zones/${zoneId}`);
+                if (!response.ok) {
+                    throw new Error('Zone not found');
+                }
+
+                const zone = await response.json();
+
+                // Set room dimensions
+                const tileWorldSize = 48;
+                roomWidth = zone.floor?.width || Math.ceil(zone.width / tileWorldSize);
+                roomHeight = zone.floor?.height || Math.ceil(zone.height / tileWorldSize);
+                document.getElementById('roomWidth').value = roomWidth;
+                document.getElementById('roomHeight').value = roomHeight;
+                document.getElementById('zoneName').value = zoneId;
+                document.getElementById('zoneId').value = zoneId;
+
+                // Clear existing data
+                roomData = { floor: {}, walls: [], objects: {} };
+
+                // Load floor tiles
+                if (zone.floor?.tiles) {
+                    zone.floor.tiles.forEach(tile => {
+                        const key = `${tile.x},${tile.y}`;
+                        roomData.floor[key] = {
+                            tileset: tile.tileset,
+                            tileX: tile.tileX,
+                            tileY: tile.tileY,
+                            flipH: tile.flipH || false,
+                            flipV: tile.flipV || false
+                        };
+                    });
+                }
+
+                // Load objects
+                if (zone.objects?.tiles) {
+                    zone.objects.tiles.forEach(tile => {
+                        const key = `${tile.x},${tile.y}`;
+                        roomData.objects[key] = {
+                            tileset: tile.tileset,
+                            tileX: tile.tileX,
+                            tileY: tile.tileY,
+                            flipH: tile.flipH || false,
+                            flipV: tile.flipV || false,
+                            physical: tile.physical || false
+                        };
+                    });
+                }
+
+                // Load walls
+                if (zone.walls) {
+                    roomData.walls = zone.walls.slice();
+                }
+
+                // Load all required tilesets
+                const usedTilesets = new Set();
+                Object.values(roomData.floor).forEach(t => usedTilesets.add(t.tileset));
+                Object.values(roomData.objects).forEach(t => usedTilesets.add(t.tileset));
+
+                await Promise.all([...usedTilesets].map(ts => {
+                    if (!tilesetImages[ts] && TILESETS[ts]) {
+                        return loadTileset(ts);
+                    }
+                    return Promise.resolve();
+                }));
+
+                resizeRoom();
+                document.getElementById('statusBar').textContent = `Loaded zone: ${zoneId}`;
+                setTimeout(updateStatus, 2000);
+
+            } catch (err) {
+                alert('Failed to load zone: ' + err.message);
+                updateStatus();
+            }
+        }
+
+        // Save zone to server
+        async function saveToServer() {
+            const zoneId = document.getElementById('zoneId').value.trim();
+            if (!zoneId) {
+                alert('Please enter a zone ID');
+                return;
+            }
+
+            // Validate zone ID format (lowercase, no spaces)
+            if (!/^[a-z][a-z0-9_-]*$/.test(zoneId)) {
+                alert('Zone ID must start with a letter and contain only lowercase letters, numbers, hyphens, and underscores');
+                return;
+            }
+
+            const worldWidth = roomWidth * TILE_SIZE * 3;
+            const worldHeight = roomHeight * TILE_SIZE * 3;
+
+            // Build floor tiles array
+            const floorTiles = [];
+            for (const [key, tile] of Object.entries(roomData.floor)) {
+                const [x, y] = key.split(',').map(Number);
+                const tileData = { x, y, tileset: tile.tileset, tileX: tile.tileX, tileY: tile.tileY };
+                if (tile.flipH) tileData.flipH = true;
+                if (tile.flipV) tileData.flipV = true;
+                floorTiles.push(tileData);
+            }
+
+            // Build objects tiles array
+            const objectTiles = [];
+            for (const [key, tile] of Object.entries(roomData.objects)) {
+                const [x, y] = key.split(',').map(Number);
+                const tileData = { x, y, tileset: tile.tileset, tileX: tile.tileX, tileY: tile.tileY };
+                if (tile.flipH) tileData.flipH = true;
+                if (tile.flipV) tileData.flipV = true;
+                if (tile.physical) tileData.physical = true;
+                objectTiles.push(tileData);
+            }
+
+            // Build zone data object
+            const zoneData = {
+                name: zoneId,
+                width: worldWidth,
+                height: worldHeight,
+                startX: Math.floor(worldWidth / 2),
+                startY: Math.floor(worldHeight / 2),
+                floor: {
+                    width: roomWidth,
+                    height: roomHeight,
+                    tiles: floorTiles
+                },
+                objects: {
+                    width: roomWidth,
+                    height: roomHeight,
+                    tiles: objectTiles
+                },
+                walls: roomData.walls,
+                portals: [],
+                npcs: [],
+                enemies: []
+            };
+
+            document.getElementById('statusBar').textContent = 'Saving to server...';
+
+            try {
+                const response = await fetch(`/api/zones/${zoneId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(zoneData)
+                });
+
+                if (response.ok) {
+                    document.getElementById('statusBar').textContent = `Zone "${zoneId}" saved successfully!`;
+                    setTimeout(updateStatus, 3000);
+                } else {
+                    const error = await response.text();
+                    alert('Failed to save zone: ' + error);
+                    updateStatus();
+                }
+            } catch (err) {
+                alert('Error saving zone: ' + err.message);
+                updateStatus();
+            }
         }
 
         // Start

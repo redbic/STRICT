@@ -208,6 +208,73 @@ app.post('/api/inventory', async (req, res) => {
   }
 });
 
+// --- Zone API ---
+
+const fs = require('fs').promises;
+const zonesDir = path.join(__dirname, 'public', 'data', 'zones');
+
+// Save zone data
+app.post('/api/zones/:zoneId', async (req, res) => {
+  const zoneId = normalizeSafeString(req.params.zoneId);
+  if (!zoneId || !/^[a-z0-9_-]+$/i.test(zoneId)) {
+    return res.status(400).json({ error: 'Invalid zone ID' });
+  }
+
+  const zoneData = req.body;
+  if (!zoneData || typeof zoneData !== 'object') {
+    return res.status(400).json({ error: 'Invalid zone data' });
+  }
+
+  try {
+    // Ensure directory exists
+    await fs.mkdir(zonesDir, { recursive: true });
+
+    // Write zone file
+    const filePath = path.join(zonesDir, `${zoneId}.json`);
+    await fs.writeFile(filePath, JSON.stringify(zoneData, null, 2));
+
+    res.json({ success: true, zoneId });
+  } catch (error) {
+    console.error('Zone save error:', error);
+    res.status(500).json({ error: 'Failed to save zone' });
+  }
+});
+
+// Get zone data
+app.get('/api/zones/:zoneId', async (req, res) => {
+  const zoneId = normalizeSafeString(req.params.zoneId);
+  if (!zoneId || !/^[a-z0-9_-]+$/i.test(zoneId)) {
+    return res.status(400).json({ error: 'Invalid zone ID' });
+  }
+
+  try {
+    const filePath = path.join(zonesDir, `${zoneId}.json`);
+    const data = await fs.readFile(filePath, 'utf8');
+    res.json(JSON.parse(data));
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      return res.status(404).json({ error: 'Zone not found' });
+    }
+    console.error('Zone load error:', error);
+    res.status(500).json({ error: 'Failed to load zone' });
+  }
+});
+
+// List all zones
+app.get('/api/zones', async (req, res) => {
+  try {
+    await fs.mkdir(zonesDir, { recursive: true });
+    const files = await fs.readdir(zonesDir);
+    const zones = files
+      .filter(f => f.endsWith('.json'))
+      .map(f => f.replace('.json', ''));
+    res.json({ zones });
+  } catch (error) {
+    console.error('Zone list error:', error);
+    res.status(500).json({ error: 'Failed to list zones' });
+  }
+});
+
 // --- Database schema migration ---
 
 async function ensurePlayerSchema() {
