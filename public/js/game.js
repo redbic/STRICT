@@ -847,6 +847,11 @@ class Game {
     }
     
     start() {
+        // Prevent multiple game loops from running
+        if (this.running) {
+            console.warn('Game.start() called but game is already running');
+            return;
+        }
         this.running = true;
         this.lastFrameTime = 0;
         requestAnimationFrame((ts) => this.gameLoop(ts));
