@@ -2261,5 +2261,14 @@
     }
   ],
   "npcs": [],
-  "enemies": []
+  "enemies": [
+    {
+      "x": 360,
+      "y": 600,
+      "stationary": true,
+      "passive": true,
+      "hp": 100,
+      "maxHp": 100
+    }
+  ]
 }

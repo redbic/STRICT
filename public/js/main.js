@@ -289,11 +289,11 @@ function setupNetworkHandlers() {
         startGame('hub');
     };
 
-    networkManager.onZoneEnter = (data) => {
+    networkManager.onZoneEnter = async (data) => {
         // This is for the LOCAL player entering a zone
         if (game && data.zoneId && data.playerId === networkManager.playerId) {
             const zonePlayers = data.zonePlayers || [];
-            game.transitionZone(data.zoneId, zonePlayers, networkManager.playerId);
+            await game.transitionZone(data.zoneId, zonePlayers, networkManager.playerId);
             // Update zone host status after zone change
             updateZoneHostStatus();
         }
@@ -373,7 +373,6 @@ function setupNetworkHandlers() {
     networkManager.onEnemySync = (data) => {
         // Only apply enemy sync if we're not running our own enemy AI
         if (game && !game.isHost && !game.isZoneHost) {
-            console.log('Applying enemy sync:', data.enemies?.length, 'enemies');
             game.applyEnemySync(data.enemies);
         }
     };

@@ -34,7 +34,9 @@ class Enemy {
 
         this.speed = options.speed !== undefined ? options.speed : ENEMY_DEFAULT_SPEED;
         this.hp = options.hp !== undefined ? options.hp : ENEMY_DEFAULT_HP;
-        this.maxHp = options.maxHp !== undefined ? options.maxHp : ENEMY_DEFAULT_HP;
+        // Ensure maxHp is at least as large as hp (prevents invisible damage bug)
+        const baseMaxHp = options.maxHp !== undefined ? options.maxHp : ENEMY_DEFAULT_HP;
+        this.maxHp = Math.max(baseMaxHp, this.hp);
         this.damage = options.damage !== undefined ? options.damage : ENEMY_DEFAULT_DAMAGE;
         this.attackRange = ENEMY_ATTACK_RANGE;
         this.aggroRange = ENEMY_AGGRO_RANGE;
