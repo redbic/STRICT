@@ -255,14 +255,19 @@ class Game {
 
         // Interpolate remote players toward their latest server state
         this.players.forEach(player => {
-            if (player !== this.localPlayer) {
+            // Use ID check to avoid interpolating local player (even if reference differs)
+            if (this.localPlayer && player.id !== this.localPlayer.id) {
                 player.interpolateRemote(dt);
             }
         });
 
-        // Debug: Check for duplicate players or issues
-        if (this.players.filter(p => p.id === this.localPlayer?.id).length > 1) {
-            console.error('DUPLICATE LOCAL PLAYER DETECTED!');
+        // Clean up any duplicate local players (keep only the real localPlayer)
+        if (this.localPlayer) {
+            const duplicates = this.players.filter(p => p.id === this.localPlayer.id && p !== this.localPlayer);
+            if (duplicates.length > 0) {
+                console.error('DUPLICATE LOCAL PLAYER DETECTED! Removing', duplicates.length, 'duplicates');
+                this.players = this.players.filter(p => p.id !== this.localPlayer.id || p === this.localPlayer);
+            }
         }
 
         // Update projectiles

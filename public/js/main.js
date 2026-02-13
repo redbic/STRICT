@@ -165,14 +165,14 @@ function setupNetworkHandlers() {
     };
     
     networkManager.onPlayerState = (data) => {
-        if (game) {
-            const player = game.players.find(p => p.id === data.playerId);
-            if (player && player !== game.localPlayer) {
-                player.setState(data.state);
+        if (game && game.localPlayer) {
+            // Never apply state to local player (check by ID, not reference)
+            if (data.playerId === game.localPlayer.id) {
+                return;
             }
-            // Debug: Check if local player is being found incorrectly
-            if (player === game.localPlayer) {
-                console.warn('WARNING: Received state update for local player!', data.playerId);
+            const player = game.players.find(p => p.id === data.playerId);
+            if (player) {
+                player.setState(data.state);
             }
         }
     };
@@ -213,6 +213,9 @@ function setupNetworkHandlers() {
             game.players = game.players.filter(p => p.id !== data.playerId);
         } else if (data.zoneId === localZoneId) {
             // Player entered our zone - add them if not already present
+            // Never add local player as duplicate
+            if (data.playerId === networkManager.playerId) return;
+
             const existingPlayer = game.players.find(p => p.id === data.playerId);
             if (!existingPlayer && playerInfo) {
                 const colors = ['#e74c3c', '#2ecc71', '#f1c40f', '#9b59b6', '#1abc9c'];
