@@ -445,6 +445,7 @@ const MYZONE_FLOOR = {
                     <div class="layer-tab active" data-layer="floor">Floor</div>
                     <div class="layer-tab" data-layer="walls">Walls</div>
                     <div class="layer-tab" data-layer="objects">Objects</div>
+                    <div class="layer-tab" data-layer="portals">Portals</div>
                 </div>
                 <div class="tileset-select">
                     <select id="tilesetSelect"></select>
@@ -469,6 +470,9 @@ const MYZONE_FLOOR = {
             </div>
             <div class="wall-options" id="wallOptions">
                 <label>Wall Thickness: <input type="number" id="wallThickness" value="50" min="10" max="200"> px</label>
+            </div>
+            <div class="wall-options" id="portalOptions">
+                <label style="color:#4a9;">Portal Mode: Click & drag to create portal hitbox</label>
             </div>
             <div class="palette-tiles" id="paletteTiles">
                 <div class="tileset-wrapper" id="tilesetWrapper">
@@ -582,11 +586,13 @@ const MYZONE_FLOOR = {
         let roomData = {
             floor: {},    // { "x,y": { tileset, tileX, tileY, flipH, flipV } }
             walls: [],    // [{ x, y, width, height }]
-            objects: {}   // { "x,y": { tileset, tileX, tileY, flipH, flipV } }
+            objects: {},  // { "x,y": { tileset, tileX, tileY, flipH, flipV } }
+            portals: []   // [{ id, x, y, width, height }]
         };
 
-        // Wall drawing state
+        // Wall/Portal drawing state
         let wallStart = null;
+        let portalStart = null;
 
         const canvas = document.getElementById('roomCanvas');
         const ctx = canvas.getContext('2d');
@@ -617,6 +623,7 @@ const MYZONE_FLOOR = {
                     tab.classList.add('active');
                     currentLayer = tab.dataset.layer;
                     document.getElementById('wallOptions').classList.toggle('visible', currentLayer === 'walls');
+                    document.getElementById('portalOptions').classList.toggle('visible', currentLayer === 'portals');
                     updateStatus();
                 });
             });
@@ -871,6 +878,26 @@ const MYZONE_FLOOR = {
                 ctx.fillRect(sx, sy, sw, sh);
                 ctx.strokeRect(sx, sy, sw, sh);
             }
+
+            // Draw portals
+            ctx.fillStyle = 'rgba(80, 200, 120, 0.4)';
+            ctx.strokeStyle = '#2a9d5c';
+            ctx.lineWidth = 2;
+            ctx.font = '12px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            for (const portal of roomData.portals) {
+                const sx = (portal.x / (roomWidth * TILE_SIZE * 3)) * canvas.width;
+                const sy = (portal.y / (roomHeight * TILE_SIZE * 3)) * canvas.height;
+                const sw = (portal.width / (roomWidth * TILE_SIZE * 3)) * canvas.width;
+                const sh = (portal.height / (roomHeight * TILE_SIZE * 3)) * canvas.height;
+                ctx.fillRect(sx, sy, sw, sh);
+                ctx.strokeRect(sx, sy, sw, sh);
+                // Draw label
+                ctx.fillStyle = '#fff';
+                ctx.fillText('→ ' + portal.id, sx + sw / 2, sy + sh / 2);
+                ctx.fillStyle = 'rgba(80, 200, 120, 0.4)';
+            }
         }
 
         function drawTileAt(tile, gridX, gridY) {
@@ -939,6 +966,9 @@ const MYZONE_FLOOR = {
             if (currentLayer === 'walls') {
                 wallStart = getWorldPos(e);
                 isDrawing = true;
+            } else if (currentLayer === 'portals') {
+                portalStart = getGridPos(e);
+                isDrawing = true;
             } else {
                 isDrawing = true;
                 placeTile(e);
@@ -950,7 +980,7 @@ const MYZONE_FLOOR = {
             document.getElementById('statusBar').textContent =
                 `Position: (${pos.x}, ${pos.y}) | Layer: ${currentLayer} | Tool: ${currentTool}`;
 
-            if (isDrawing && currentLayer !== 'walls') {
+            if (isDrawing && currentLayer !== 'walls' && currentLayer !== 'portals') {
                 placeTile(e);
             }
         }
@@ -984,6 +1014,48 @@ const MYZONE_FLOOR = {
                 wallStart = null;
                 renderRoom();
                 updateExport();
+            } else if (currentLayer === 'portals' && portalStart && isDrawing) {
+                const portalEnd = getGridPos(e);
+
+                if (currentTool === 'erase') {
+                    // Find and remove portal at click position
+                    const clickPos = getGridPos(e);
+                    roomData.portals = roomData.portals.filter(p => {
+                        const pStartX = Math.floor(p.x / (TILE_SIZE * 3));
+                        const pStartY = Math.floor(p.y / (TILE_SIZE * 3));
+                        const pEndX = Math.floor((p.x + p.width) / (TILE_SIZE * 3));
+                        const pEndY = Math.floor((p.y + p.height) / (TILE_SIZE * 3));
+                        return !(clickPos.x >= pStartX && clickPos.x <= pEndX &&
+                                 clickPos.y >= pStartY && clickPos.y <= pEndY);
+                    });
+                } else {
+                    // Calculate portal bounds in world coordinates
+                    const startX = Math.min(portalStart.x, portalEnd.x);
+                    const startY = Math.min(portalStart.y, portalEnd.y);
+                    const endX = Math.max(portalStart.x, portalEnd.x);
+                    const endY = Math.max(portalStart.y, portalEnd.y);
+
+                    const worldX = startX * TILE_SIZE * 3;
+                    const worldY = startY * TILE_SIZE * 3;
+                    const worldW = (endX - startX + 1) * TILE_SIZE * 3;
+                    const worldH = (endY - startY + 1) * TILE_SIZE * 3;
+
+                    // Prompt for target zone ID
+                    const targetZone = prompt('Enter target zone ID (e.g., "elevator", "training"):');
+                    if (targetZone && targetZone.trim()) {
+                        roomData.portals.push({
+                            id: targetZone.trim(),
+                            x: worldX,
+                            y: worldY,
+                            width: worldW,
+                            height: worldH
+                        });
+                    }
+                }
+
+                portalStart = null;
+                renderRoom();
+                updateExport();
             }
             isDrawing = false;
         }
@@ -1015,8 +1087,8 @@ const MYZONE_FLOOR = {
         }
 
         function clearRoom() {
-            if (!confirm('Clear all tiles and walls?')) return;
-            roomData = { floor: {}, walls: [], objects: {} };
+            if (!confirm('Clear all tiles, walls and portals?')) return;
+            roomData = { floor: {}, walls: [], objects: {}, portals: [] };
             renderRoom();
             updateExport();
         }
@@ -1376,6 +1448,11 @@ const MYZONE_FLOOR = {
                     roomData.walls = zone.walls.slice();
                 }
 
+                // Load portals
+                if (zone.portals) {
+                    roomData.portals = zone.portals.slice();
+                }
+
                 // Load all required tilesets
                 const usedTilesets = new Set();
                 Object.values(roomData.floor).forEach(t => usedTilesets.add(t.tileset));
@@ -1461,7 +1538,7 @@ const MYZONE_FLOOR = {
                     tiles: objectTiles
                 },
                 walls: roomData.walls,
-                portals: [],
+                portals: roomData.portals,
                 npcs: [],
                 enemies: []
             };
