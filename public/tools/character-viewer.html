@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Character Sprite Viewer</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            padding: 20px;
+        }
+        h1 { color: #b5a589; margin-bottom: 20px; }
+        .controls {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        label { color: #b5a589; }
+        select, input {
+            padding: 8px;
+            background: #2a2a4a;
+            border: 1px solid #444;
+            color: #eee;
+            border-radius: 4px;
+        }
+        .sprite-info {
+            background: #2a2a4a;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .row-display {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .row-card {
+            background: #2a2a4a;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .row-card h3 {
+            color: #b5a589;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        .row-card canvas {
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            background: #1a1a2e;
+            border: 1px solid #444;
+        }
+        .frame-strip {
+            display: flex;
+            gap: 4px;
+            margin-top: 10px;
+            justify-content: center;
+        }
+        .frame-strip canvas {
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            border: 1px solid #333;
+        }
+        .animation-preview {
+            margin-top: 10px;
+        }
+        .row-label {
+            font-family: monospace;
+            font-size: 12px;
+            color: #888;
+            margin-top: 5px;
+        }
+        .full-sheet {
+            margin-top: 30px;
+            background: #2a2a4a;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        .full-sheet h2 {
+            color: #b5a589;
+            margin-bottom: 15px;
+        }
+        .full-sheet img {
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            max-width: 100%;
+            border: 1px solid #444;
+        }
+    </style>
+</head>
+<body>
+    <h1>Character Sprite Viewer</h1>
+
+    <div class="controls">
+        <div>
+            <label for="charSelect">Character:</label>
+            <select id="charSelect"></select>
+        </div>
+        <div>
+            <label for="frameWidth">Frame Width:</label>
+            <input type="number" id="frameWidth" value="16" min="8" max="64">
+        </div>
+        <div>
+            <label for="frameHeight">Frame Height:</label>
+            <input type="number" id="frameHeight" value="32" min="8" max="64">
+        </div>
+        <div>
+            <label for="framesPerRow">Frames to show:</label>
+            <input type="number" id="framesPerRow" value="6" min="1" max="20">
+        </div>
+        <div>
+            <label for="rowsToShow">Rows to show:</label>
+            <input type="number" id="rowsToShow" value="8" min="1" max="30">
+        </div>
+    </div>
+
+    <div class="sprite-info" id="spriteInfo">Loading...</div>
+
+    <div class="row-display" id="rowDisplay"></div>
+
+    <div class="full-sheet">
+        <h2>Full Sprite Sheet</h2>
+        <img id="fullSheet" src="" alt="Full sprite sheet">
+    </div>
+
+    <script>
+        let currentImage = null;
+        let animationFrames = {};
+
+        // Populate character dropdown
+        const charSelect = document.getElementById('charSelect');
+        for (let i = 1; i <= 20; i++) {
+            const num = i.toString().padStart(2, '0');
+            const option = document.createElement('option');
+            option.value = num;
+            option.textContent = `Character ${num}`;
+            charSelect.appendChild(option);
+        }
+
+        function loadCharacter(num) {
+            const path = `/assets/characters/Premade_Character_${num}.png`;
+            const img = new Image();
+            img.onload = () => {
+                currentImage = img;
+                document.getElementById('fullSheet').src = path;
+                document.getElementById('spriteInfo').innerHTML = `
+                    <strong>Sprite Sheet:</strong> ${img.width} x ${img.height} pixels<br>
+                    <strong>With current frame size:</strong> ${Math.floor(img.width / parseInt(document.getElementById('frameWidth').value))} columns x ${Math.floor(img.height / parseInt(document.getElementById('frameHeight').value))} rows
+                `;
+                renderRows();
+            };
+            img.src = path;
+        }
+
+        function renderRows() {
+            if (!currentImage) return;
+
+            const frameWidth = parseInt(document.getElementById('frameWidth').value);
+            const frameHeight = parseInt(document.getElementById('frameHeight').value);
+            const framesPerRow = parseInt(document.getElementById('framesPerRow').value);
+            const rowsToShow = parseInt(document.getElementById('rowsToShow').value);
+
+            const container = document.getElementById('rowDisplay');
+            container.innerHTML = '';
+
+            // Stop any existing animations
+            Object.values(animationFrames).forEach(id => cancelAnimationFrame(id));
+            animationFrames = {};
+
+            for (let row = 0; row < rowsToShow; row++) {
+                const card = document.createElement('div');
+                card.className = 'row-card';
+
+                const title = document.createElement('h3');
+                title.textContent = `Row ${row}`;
+                card.appendChild(title);
+
+                // Animated preview
+                const previewCanvas = document.createElement('canvas');
+                previewCanvas.width = frameWidth * 4;
+                previewCanvas.height = frameHeight * 4;
+                card.appendChild(previewCanvas);
+
+                // Animate this row
+                let frameIndex = 0;
+                function animate() {
+                    const ctx = previewCanvas.getContext('2d');
+                    ctx.imageSmoothingEnabled = false;
+                    ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+                    ctx.drawImage(
+                        currentImage,
+                        frameIndex * frameWidth, row * frameHeight, frameWidth, frameHeight,
+                        0, 0, previewCanvas.width, previewCanvas.height
+                    );
+                    frameIndex = (frameIndex + 1) % framesPerRow;
+                    animationFrames[row] = setTimeout(() => requestAnimationFrame(animate), 150);
+                }
+                animate();
+
+                // Frame strip
+                const strip = document.createElement('div');
+                strip.className = 'frame-strip';
+                for (let frame = 0; frame < framesPerRow; frame++) {
+                    const frameCanvas = document.createElement('canvas');
+                    frameCanvas.width = frameWidth * 2;
+                    frameCanvas.height = frameHeight * 2;
+                    const ctx = frameCanvas.getContext('2d');
+                    ctx.imageSmoothingEnabled = false;
+                    ctx.drawImage(
+                        currentImage,
+                        frame * frameWidth, row * frameHeight, frameWidth, frameHeight,
+                        0, 0, frameCanvas.width, frameCanvas.height
+                    );
+                    strip.appendChild(frameCanvas);
+                }
+                card.appendChild(strip);
+
+                // Label
+                const label = document.createElement('div');
+                label.className = 'row-label';
+                label.textContent = `srcY: ${row * frameHeight}px`;
+                card.appendChild(label);
+
+                container.appendChild(card);
+            }
+        }
+
+        // Event listeners
+        charSelect.addEventListener('change', (e) => loadCharacter(e.target.value));
+        document.getElementById('frameWidth').addEventListener('change', renderRows);
+        document.getElementById('frameHeight').addEventListener('change', renderRows);
+        document.getElementById('framesPerRow').addEventListener('change', renderRows);
+        document.getElementById('rowsToShow').addEventListener('change', renderRows);
+
+        // Initial load
+        loadCharacter('01');
+    </script>
+</body>
+</html>
