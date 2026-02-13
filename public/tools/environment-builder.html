@@ -68,7 +68,7 @@
 
         /* Left panel - Tile palette */
         .palette-panel {
-            width: 280px;
+            width: 420px;
             background: #252545;
             border-right: 1px solid #444;
             display: flex;
@@ -104,37 +104,57 @@
         }
         .tileset-select {
             margin-top: 10px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
         }
         .tileset-select select {
-            width: 100%;
+            flex: 1;
             padding: 6px;
             background: #1a1a2e;
             border: 1px solid #444;
             color: #eee;
             border-radius: 3px;
         }
+        .tileset-select label {
+            font-size: 12px;
+            color: #888;
+        }
         .palette-tiles {
             flex: 1;
-            overflow-y: auto;
+            overflow: auto;
             padding: 10px;
+            background: #1a1a2e;
         }
-        .palette-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(32px, 1fr));
-            gap: 2px;
+        .tileset-wrapper {
+            position: relative;
+            display: inline-block;
+            cursor: crosshair;
         }
-        .palette-tile {
-            width: 32px;
-            height: 32px;
-            border: 1px solid #333;
-            cursor: pointer;
+        .tileset-image {
+            display: block;
             image-rendering: pixelated;
+            image-rendering: crisp-edges;
         }
-        .palette-tile:hover {
-            border-color: #ffcc00;
+        .tileset-grid-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
         }
-        .palette-tile.selected {
-            border: 2px solid #00ff88;
+        .tileset-hover {
+            position: absolute;
+            border: 2px solid #ffcc00;
+            background: rgba(255, 204, 0, 0.2);
+            pointer-events: none;
+            display: none;
+        }
+        .tileset-selected {
+            position: absolute;
+            border: 3px solid #00ff88;
+            background: rgba(0, 255, 136, 0.3);
+            pointer-events: none;
+            display: none;
         }
         .selected-preview {
             padding: 10px;
@@ -142,6 +162,7 @@
             display: flex;
             align-items: center;
             gap: 10px;
+            background: #252545;
         }
         .selected-preview canvas {
             image-rendering: pixelated;
@@ -334,6 +355,13 @@
                 </div>
                 <div class="tileset-select">
                     <select id="tilesetSelect"></select>
+                    <label>Scale:
+                        <select id="paletteScale">
+                            <option value="2">2x</option>
+                            <option value="3" selected>3x</option>
+                            <option value="4">4x</option>
+                        </select>
+                    </label>
                 </div>
             </div>
             <div class="tools-bar">
@@ -344,12 +372,17 @@
             <div class="wall-options" id="wallOptions">
                 <label>Wall Thickness: <input type="number" id="wallThickness" value="50" min="10" max="200"> px</label>
             </div>
-            <div class="palette-tiles">
-                <div class="palette-grid" id="paletteGrid"></div>
+            <div class="palette-tiles" id="paletteTiles">
+                <div class="tileset-wrapper" id="tilesetWrapper">
+                    <img class="tileset-image" id="tilesetImage" src="" alt="Tileset">
+                    <canvas class="tileset-grid-overlay" id="tilesetGridOverlay"></canvas>
+                    <div class="tileset-hover" id="tilesetHover"></div>
+                    <div class="tileset-selected" id="tilesetSelected"></div>
+                </div>
             </div>
             <div class="selected-preview">
                 <canvas id="selectedTilePreview" width="48" height="48"></canvas>
-                <div class="selected-info" id="selectedInfo">No tile selected</div>
+                <div class="selected-info" id="selectedInfo">No tile selected<br><span style="color:#666;font-size:11px">Click a tile above to select</span></div>
             </div>
         </div>
 
@@ -388,23 +421,50 @@
     <div class="status-bar" id="statusBar">Ready - Click tiles to place</div>
 
     <script>
-        // Tilesets configuration
+        // Tilesets configuration (matching tile-picker)
         const TILESETS = {
-            floors: { path: '/assets/tiles/Room_Builder_Floors_16x16.png', name: 'Floors' },
-            walls: { path: '/assets/tiles/Room_Builder_Walls_16x16.png', name: 'Walls' },
-            walls3d: { path: '/assets/tiles/Room_Builder_3d_walls_16x16.png', name: '3D Walls' },
-            t01_generic: { path: '/assets/tiles/1_Generic_16x16.png', name: 'Generic' },
-            t02_livingRoom: { path: '/assets/tiles/2_LivingRoom_16x16.png', name: 'Living Room' },
-            t03_bathroom: { path: '/assets/tiles/3_Bathroom_16x16.png', name: 'Bathroom' },
-            t04_bedroom: { path: '/assets/tiles/4_Bedroom_16x16.png', name: 'Bedroom' },
-            t12_kitchen: { path: '/assets/tiles/12_Kitchen_16x16.png', name: 'Kitchen' },
-            t13_conference: { path: '/assets/tiles/13_Conference_Hall_16x16.png', name: 'Conference' },
-            t16_grocery: { path: '/assets/tiles/16_Grocery_store_16x16.png', name: 'Grocery' },
-            t19_hospital: { path: '/assets/tiles/19_Hospital_16x16.png', name: 'Hospital' },
+            // Room Builder
+            floors: { path: '/assets/tiles/Room_Builder_Floors_16x16.png', name: 'RB - Floors' },
+            walls: { path: '/assets/tiles/Room_Builder_Walls_16x16.png', name: 'RB - Walls' },
+            walls3d: { path: '/assets/tiles/Room_Builder_3d_walls_16x16.png', name: 'RB - 3D Walls' },
+            arches: { path: '/assets/tiles/Room_Builder_Arched_Entryways_16x16.png', name: 'RB - Arches' },
+            baseboards: { path: '/assets/tiles/Room_Builder_Baseboards_16x16.png', name: 'RB - Baseboards' },
+            borders: { path: '/assets/tiles/Room_Builder_borders_16x16.png', name: 'RB - Borders' },
+            floorConnectors: { path: '/assets/tiles/Room_Builder_Floor_Connectors_16x16.png', name: 'RB - Floor Connectors' },
+            floorPaths: { path: '/assets/tiles/Room_Builder_Floor_Paths_16x16.png', name: 'RB - Floor Paths' },
+            floorShadows: { path: '/assets/tiles/Room_Builder_Floor_Shadows_16x16.png', name: 'RB - Floor Shadows' },
+            // Theme packs
+            t01_generic: { path: '/assets/tiles/1_Generic_16x16.png', name: '01 - Generic' },
+            t02_livingRoom: { path: '/assets/tiles/2_LivingRoom_16x16.png', name: '02 - Living Room' },
+            t03_bathroom: { path: '/assets/tiles/3_Bathroom_16x16.png', name: '03 - Bathroom' },
+            t04_bedroom: { path: '/assets/tiles/4_Bedroom_16x16.png', name: '04 - Bedroom' },
+            t05_classroom: { path: '/assets/tiles/5_Classroom_and_library_16x16.png', name: '05 - Classroom' },
+            t06_music: { path: '/assets/tiles/6_Music_and_sport_16x16.png', name: '06 - Music & Sport' },
+            t07_art: { path: '/assets/tiles/7_Art_16x16.png', name: '07 - Art' },
+            t08_gym: { path: '/assets/tiles/8_Gym_16x16.png', name: '08 - Gym' },
+            t09_fishing: { path: '/assets/tiles/9_Fishing_16x16.png', name: '09 - Fishing' },
+            t10_birthday: { path: '/assets/tiles/10_Birthday_party_16x16.png', name: '10 - Birthday' },
+            t11_halloween: { path: '/assets/tiles/11_Halloween_16x16.png', name: '11 - Halloween' },
+            t12_kitchen: { path: '/assets/tiles/12_Kitchen_16x16.png', name: '12 - Kitchen' },
+            t13_conference: { path: '/assets/tiles/13_Conference_Hall_16x16.png', name: '13 - Conference' },
+            t14_basement: { path: '/assets/tiles/14_Basement_16x16.png', name: '14 - Basement' },
+            t15_christmas: { path: '/assets/tiles/15_Christmas_16x16.png', name: '15 - Christmas' },
+            t16_grocery: { path: '/assets/tiles/16_Grocery_store_16x16.png', name: '16 - Grocery' },
+            t17_upstairs: { path: '/assets/tiles/17_Visibile_Upstairs_System_16x16.png', name: '17 - Upstairs' },
+            t18_jail: { path: '/assets/tiles/18_Jail_16x16.png', name: '18 - Jail' },
+            t19_hospital: { path: '/assets/tiles/19_Hospital_16x16.png', name: '19 - Hospital' },
+            t20_japanese: { path: '/assets/tiles/20_Japanese_interiors.png', name: '20 - Japanese' },
+            t21_clothing: { path: '/assets/tiles/21_Clothing_Store.png', name: '21 - Clothing' },
+            t22_museum: { path: '/assets/tiles/22_Museum.png', name: '22 - Museum' },
+            t23_tvStudio: { path: '/assets/tiles/23_Television_and_Film_Studio.png', name: '23 - TV Studio' },
+            t24_iceCream: { path: '/assets/tiles/24_Ice_Cream_Shop.png', name: '24 - Ice Cream' },
+            t25_shooting: { path: '/assets/tiles/25_Shooting_Range.png', name: '25 - Shooting Range' },
+            t26_condo: { path: '/assets/tiles/26_Condominium.png', name: '26 - Condominium' }
         };
 
         const TILE_SIZE = 16; // Source tile size
-        let displayTileSize = 32; // Display size
+        let displayTileSize = 32; // Display size for room canvas
+        let paletteScale = 3; // Scale for tileset palette
         let roomWidth = 20;
         let roomHeight = 15;
         let currentLayer = 'floor';
@@ -466,16 +526,27 @@
                 });
             });
 
-            // Canvas events
+            // Room canvas events
             canvas.addEventListener('mousedown', onCanvasMouseDown);
             canvas.addEventListener('mousemove', onCanvasMouseMove);
             canvas.addEventListener('mouseup', onCanvasMouseUp);
             canvas.addEventListener('mouseleave', onCanvasMouseUp);
             canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
+            // Tileset palette events
+            const tilesetWrapper = document.getElementById('tilesetWrapper');
+            tilesetWrapper.addEventListener('mousemove', onTilesetMouseMove);
+            tilesetWrapper.addEventListener('mouseleave', onTilesetMouseLeave);
+            tilesetWrapper.addEventListener('click', onTilesetClick);
+
             document.getElementById('tileDisplaySize').addEventListener('change', (e) => {
                 displayTileSize = parseInt(e.target.value);
                 resizeRoom();
+            });
+
+            document.getElementById('paletteScale').addEventListener('change', (e) => {
+                paletteScale = parseInt(e.target.value);
+                renderPalette();
             });
 
             updateStatus();
@@ -497,41 +568,101 @@
             }
 
             renderPalette();
+            updateSelectedHighlight();
         }
 
         function renderPalette() {
-            const grid = document.getElementById('paletteGrid');
-            grid.innerHTML = '';
-
             const img = tilesetImages[currentTileset];
             if (!img) return;
 
-            const cols = Math.floor(img.width / TILE_SIZE);
-            const rows = Math.floor(img.height / TILE_SIZE);
+            const scaledWidth = img.width * paletteScale;
+            const scaledHeight = img.height * paletteScale;
 
-            for (let y = 0; y < rows; y++) {
-                for (let x = 0; x < cols; x++) {
-                    const tileCanvas = document.createElement('canvas');
-                    tileCanvas.width = 32;
-                    tileCanvas.height = 32;
-                    tileCanvas.className = 'palette-tile';
-                    tileCanvas.dataset.tileX = x;
-                    tileCanvas.dataset.tileY = y;
+            // Update tileset image
+            const tilesetImg = document.getElementById('tilesetImage');
+            tilesetImg.src = img.src;
+            tilesetImg.style.width = scaledWidth + 'px';
+            tilesetImg.style.height = scaledHeight + 'px';
 
-                    const tileCtx = tileCanvas.getContext('2d');
-                    tileCtx.imageSmoothingEnabled = false;
-                    tileCtx.drawImage(img, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE, 0, 0, 32, 32);
+            // Draw grid overlay
+            const gridCanvas = document.getElementById('tilesetGridOverlay');
+            gridCanvas.width = scaledWidth;
+            gridCanvas.height = scaledHeight;
+            const gridCtx = gridCanvas.getContext('2d');
 
-                    tileCanvas.addEventListener('click', () => selectTile(x, y, tileCanvas));
-                    grid.appendChild(tileCanvas);
-                }
+            gridCtx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+            gridCtx.lineWidth = 1;
+
+            const scaledTileSize = TILE_SIZE * paletteScale;
+            for (let x = 0; x <= scaledWidth; x += scaledTileSize) {
+                gridCtx.beginPath();
+                gridCtx.moveTo(x + 0.5, 0);
+                gridCtx.lineTo(x + 0.5, scaledHeight);
+                gridCtx.stroke();
             }
+            for (let y = 0; y <= scaledHeight; y += scaledTileSize) {
+                gridCtx.beginPath();
+                gridCtx.moveTo(0, y + 0.5);
+                gridCtx.lineTo(scaledWidth, y + 0.5);
+                gridCtx.stroke();
+            }
+
+            updateSelectedHighlight();
         }
 
-        function selectTile(tileX, tileY, element) {
-            document.querySelectorAll('.palette-tile').forEach(t => t.classList.remove('selected'));
-            element.classList.add('selected');
+        function getTilesetCoords(e) {
+            const wrapper = document.getElementById('tilesetWrapper');
+            const rect = wrapper.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            const scaledTileSize = TILE_SIZE * paletteScale;
 
+            return {
+                tileX: Math.floor(x / scaledTileSize),
+                tileY: Math.floor(y / scaledTileSize),
+                pixelX: Math.floor(x / scaledTileSize) * scaledTileSize,
+                pixelY: Math.floor(y / scaledTileSize) * scaledTileSize
+            };
+        }
+
+        function onTilesetMouseMove(e) {
+            const coords = getTilesetCoords(e);
+            const scaledTileSize = TILE_SIZE * paletteScale;
+            const hover = document.getElementById('tilesetHover');
+
+            hover.style.display = 'block';
+            hover.style.left = coords.pixelX + 'px';
+            hover.style.top = coords.pixelY + 'px';
+            hover.style.width = scaledTileSize + 'px';
+            hover.style.height = scaledTileSize + 'px';
+        }
+
+        function onTilesetMouseLeave() {
+            document.getElementById('tilesetHover').style.display = 'none';
+        }
+
+        function onTilesetClick(e) {
+            const coords = getTilesetCoords(e);
+            selectTile(coords.tileX, coords.tileY);
+        }
+
+        function updateSelectedHighlight() {
+            const highlight = document.getElementById('tilesetSelected');
+
+            if (!selectedTile || selectedTile.tileset !== currentTileset) {
+                highlight.style.display = 'none';
+                return;
+            }
+
+            const scaledTileSize = TILE_SIZE * paletteScale;
+            highlight.style.display = 'block';
+            highlight.style.left = (selectedTile.tileX * scaledTileSize) + 'px';
+            highlight.style.top = (selectedTile.tileY * scaledTileSize) + 'px';
+            highlight.style.width = scaledTileSize + 'px';
+            highlight.style.height = scaledTileSize + 'px';
+        }
+
+        function selectTile(tileX, tileY) {
             selectedTile = { tileset: currentTileset, tileX, tileY };
 
             // Update preview
@@ -545,7 +676,8 @@
                 pCtx.drawImage(img, tileX * TILE_SIZE, tileY * TILE_SIZE, TILE_SIZE, TILE_SIZE, 0, 0, 48, 48);
             }
 
-            document.getElementById('selectedInfo').textContent = `${currentTileset} (${tileX}, ${tileY})`;
+            document.getElementById('selectedInfo').innerHTML = `<strong>${currentTileset}</strong><br>tileX: ${tileX}, tileY: ${tileY}`;
+            updateSelectedHighlight();
             updateStatus();
         }
 
