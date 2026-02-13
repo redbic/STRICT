@@ -324,6 +324,66 @@
             color: #888;
             border-top: 1px solid #444;
         }
+
+        /* Load modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-overlay.visible { display: flex; }
+        .modal {
+            background: #252545;
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 20px;
+            width: 600px;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .modal h2 {
+            color: #b5a589;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        .modal textarea {
+            flex: 1;
+            min-height: 300px;
+            background: #1a1a2e;
+            border: 1px solid #444;
+            color: #88ff88;
+            font-family: 'Consolas', monospace;
+            font-size: 11px;
+            padding: 10px;
+            resize: none;
+            border-radius: 4px;
+        }
+        .modal-buttons {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+        .modal-buttons button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .modal-buttons .cancel { background: #4a4a6a; color: #ccc; }
+        .modal-buttons .cancel:hover { background: #5a5a7a; }
+        .modal-buttons .load { background: #4a7c4e; color: #fff; }
+        .modal-buttons .load:hover { background: #5a9c5e; }
+        .modal .error { color: #ff6666; font-size: 12px; margin-top: 10px; }
     </style>
 </head>
 <body>
@@ -341,7 +401,30 @@
                 </select>
             </label>
             <button onclick="resizeRoom()">Apply Size</button>
+            <button onclick="showLoadModal()">Load Room</button>
             <button class="danger" onclick="clearRoom()">Clear All</button>
+        </div>
+    </div>
+
+    <!-- Load Room Modal -->
+    <div class="modal-overlay" id="loadModal">
+        <div class="modal">
+            <h2>Load Room Data</h2>
+            <p style="color:#888;font-size:12px;margin-bottom:10px;">Paste exported room code (FLOOR, OBJECTS, or WALLS constants):</p>
+            <textarea id="loadCodeInput" placeholder="// Paste your exported code here...
+const MYZONE_FLOOR = {
+    width: 20,
+    height: 15,
+    tiles: [
+        { x: 0, y: 0, tileset: 'floors', tileX: 9, tileY: 7 },
+        ...
+    ]
+};"></textarea>
+            <div class="error" id="loadError"></div>
+            <div class="modal-buttons">
+                <button class="cancel" onclick="hideLoadModal()">Cancel</button>
+                <button class="load" onclick="loadRoomData()">Load</button>
+            </div>
         </div>
     </div>
 
@@ -1021,6 +1104,169 @@
             document.getElementById('statusBar').textContent =
                 `Layer: ${currentLayer} | Tool: ${currentTool} | Selected: ${tileInfo}${flipInfo}${physInfo}`;
         }
+
+        // Load room modal functions
+        function showLoadModal() {
+            document.getElementById('loadModal').classList.add('visible');
+            document.getElementById('loadError').textContent = '';
+            document.getElementById('loadCodeInput').value = '';
+            document.getElementById('loadCodeInput').focus();
+        }
+
+        function hideLoadModal() {
+            document.getElementById('loadModal').classList.remove('visible');
+        }
+
+        function loadRoomData() {
+            const code = document.getElementById('loadCodeInput').value;
+            const errorEl = document.getElementById('loadError');
+            errorEl.textContent = '';
+
+            try {
+                // Parse the code to extract data
+                const result = parseRoomCode(code);
+
+                if (!result.floor && !result.objects && !result.walls) {
+                    errorEl.textContent = 'No valid room data found. Make sure to paste FLOOR, OBJECTS, or WALLS constants.';
+                    return;
+                }
+
+                // Update room dimensions if found
+                if (result.width && result.height) {
+                    roomWidth = result.width;
+                    roomHeight = result.height;
+                    document.getElementById('roomWidth').value = roomWidth;
+                    document.getElementById('roomHeight').value = roomHeight;
+                }
+
+                // Clear existing data and load new
+                roomData = { floor: {}, walls: [], objects: {} };
+
+                if (result.floor) {
+                    result.floor.forEach(tile => {
+                        const key = `${tile.x},${tile.y}`;
+                        roomData.floor[key] = {
+                            tileset: tile.tileset,
+                            tileX: tile.tileX,
+                            tileY: tile.tileY,
+                            flipH: tile.flipH || false,
+                            flipV: tile.flipV || false
+                        };
+                    });
+                }
+
+                if (result.objects) {
+                    result.objects.forEach(tile => {
+                        const key = `${tile.x},${tile.y}`;
+                        roomData.objects[key] = {
+                            tileset: tile.tileset,
+                            tileX: tile.tileX,
+                            tileY: tile.tileY,
+                            flipH: tile.flipH || false,
+                            flipV: tile.flipV || false,
+                            physical: tile.physical || false
+                        };
+                    });
+                }
+
+                if (result.walls) {
+                    roomData.walls = result.walls;
+                }
+
+                // Load any tilesets used
+                const usedTilesets = new Set();
+                Object.values(roomData.floor).forEach(t => usedTilesets.add(t.tileset));
+                Object.values(roomData.objects).forEach(t => usedTilesets.add(t.tileset));
+
+                // Load tilesets then render
+                Promise.all([...usedTilesets].map(ts => {
+                    if (!tilesetImages[ts] && TILESETS[ts]) {
+                        return loadTileset(ts);
+                    }
+                    return Promise.resolve();
+                })).then(() => {
+                    resizeRoom();
+                    hideLoadModal();
+                    document.getElementById('statusBar').textContent = 'Room loaded successfully!';
+                    setTimeout(updateStatus, 2000);
+                });
+
+            } catch (e) {
+                errorEl.textContent = 'Parse error: ' + e.message;
+            }
+        }
+
+        function parseRoomCode(code) {
+            const result = { floor: null, objects: null, walls: null, width: null, height: null };
+
+            // Extract FLOOR tiles array
+            const floorMatch = code.match(/_FLOOR\s*=\s*\{[\s\S]*?width:\s*(\d+)[\s\S]*?height:\s*(\d+)[\s\S]*?tiles:\s*\[([\s\S]*?)\]\s*\}/);
+            if (floorMatch) {
+                result.width = parseInt(floorMatch[1]);
+                result.height = parseInt(floorMatch[2]);
+                result.floor = parseTilesArray(floorMatch[3]);
+            }
+
+            // Extract OBJECTS tiles array
+            const objectsMatch = code.match(/_OBJECTS\s*=\s*\{[\s\S]*?width:\s*(\d+)[\s\S]*?height:\s*(\d+)[\s\S]*?tiles:\s*\[([\s\S]*?)\]\s*\}/);
+            if (objectsMatch) {
+                if (!result.width) result.width = parseInt(objectsMatch[1]);
+                if (!result.height) result.height = parseInt(objectsMatch[2]);
+                result.objects = parseTilesArray(objectsMatch[3]);
+            }
+
+            // Extract WALLS array
+            const wallsMatch = code.match(/_WALLS\s*=\s*\[([\s\S]*?)\];/);
+            if (wallsMatch) {
+                result.walls = parseWallsArray(wallsMatch[1]);
+            }
+
+            return result;
+        }
+
+        function parseTilesArray(tilesStr) {
+            const tiles = [];
+            // Match each tile object
+            const tilePattern = /\{\s*x:\s*(\d+)\s*,\s*y:\s*(\d+)\s*,\s*tileset:\s*'([^']+)'\s*,\s*tileX:\s*(\d+)\s*,\s*tileY:\s*(\d+)([^}]*)\}/g;
+            let match;
+            while ((match = tilePattern.exec(tilesStr)) !== null) {
+                const tile = {
+                    x: parseInt(match[1]),
+                    y: parseInt(match[2]),
+                    tileset: match[3],
+                    tileX: parseInt(match[4]),
+                    tileY: parseInt(match[5])
+                };
+                const extras = match[6];
+                if (extras.includes('flipH: true')) tile.flipH = true;
+                if (extras.includes('flipV: true')) tile.flipV = true;
+                if (extras.includes('physical: true')) tile.physical = true;
+                tiles.push(tile);
+            }
+            return tiles;
+        }
+
+        function parseWallsArray(wallsStr) {
+            const walls = [];
+            const wallPattern = /\{\s*x:\s*(\d+)\s*,\s*y:\s*(\d+)\s*,\s*width:\s*(\d+)\s*,\s*height:\s*(\d+)\s*\}/g;
+            let match;
+            while ((match = wallPattern.exec(wallsStr)) !== null) {
+                walls.push({
+                    x: parseInt(match[1]),
+                    y: parseInt(match[2]),
+                    width: parseInt(match[3]),
+                    height: parseInt(match[4])
+                });
+            }
+            return walls;
+        }
+
+        // Close modal on escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && document.getElementById('loadModal').classList.contains('visible')) {
+                hideLoadModal();
+            }
+        });
 
         // Start
         init();
