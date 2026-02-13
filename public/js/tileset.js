@@ -13,6 +13,7 @@ class TilesetManager {
             floors: '/assets/tiles/Room_Builder_Floors_16x16.png',
             walls: '/assets/tiles/Room_Builder_Walls_16x16.png',
             generic: '/assets/tiles/1_Generic_16x16.png',
+            t01_generic: '/assets/tiles/1_Generic_16x16.png',  // Alias for environment builder
             livingRoom: '/assets/tiles/2_LivingRoom_16x16.png',
             bedroom: '/assets/tiles/4_Bedroom_16x16.png',
             conference: '/assets/tiles/13_Conference_Hall_16x16.png'
