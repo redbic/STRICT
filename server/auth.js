@@ -53,13 +53,14 @@ function createAuthRouter() {
 
 // Auth middleware - protect all routes except login
 function authMiddleware(req, res, next) {
-  // Allow access to login page, login endpoint, health check, dev tools, and static assets needed for login
+  // Allow access to login page, login endpoint, health check, dev tools, and static assets
   if (req.path === '/login.html' ||
       req.path === '/login' ||
       req.path === '/health' ||
       req.path.startsWith('/css/') ||
       req.path.startsWith('/fonts/') ||
-      req.path.startsWith('/tools/')) {
+      req.path.startsWith('/tools/') ||
+      req.path.startsWith('/assets/')) {
     return next();
   }
 
