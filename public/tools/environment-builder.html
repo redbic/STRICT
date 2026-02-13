@@ -1577,7 +1577,18 @@ const MYZONE_FLOOR = {
 
         // Save zone to server
         async function saveToServer() {
-            const zoneId = document.getElementById('zoneId').value.trim();
+            console.log('saveToServer called');
+            const zoneIdInput = document.getElementById('zoneId');
+            console.log('zoneId input element:', zoneIdInput);
+
+            if (!zoneIdInput) {
+                alert('Error: zoneId input not found');
+                return;
+            }
+
+            const zoneId = zoneIdInput.value.trim();
+            console.log('zoneId value:', zoneId);
+
             if (!zoneId) {
                 alert('Please enter a zone ID');
                 return;
@@ -1637,23 +1648,33 @@ const MYZONE_FLOOR = {
             };
 
             document.getElementById('statusBar').textContent = 'Saving to server...';
+            console.log('Sending zone data:', zoneData);
 
             try {
+                console.log('Fetching /api/zones/' + zoneId);
                 const response = await fetch(`/api/zones/${zoneId}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(zoneData)
                 });
 
+                console.log('Response status:', response.status);
+                console.log('Response ok:', response.ok);
+
                 if (response.ok) {
+                    const result = await response.json();
+                    console.log('Save result:', result);
                     document.getElementById('statusBar').textContent = `Zone "${zoneId}" saved successfully!`;
+                    refreshServerZones();
                     setTimeout(updateStatus, 3000);
                 } else {
                     const error = await response.text();
+                    console.error('Save failed:', error);
                     alert('Failed to save zone: ' + error);
                     updateStatus();
                 }
             } catch (err) {
+                console.error('Save error:', err);
                 alert('Error saving zone: ' + err.message);
                 updateStatus();
             }
