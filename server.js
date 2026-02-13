@@ -48,7 +48,7 @@ const WS_MESSAGE_TYPES = new Set([
 // Outbound message types (server -> client):
 // room_update, player_state, game_start, zone_enter, player_zone,
 // balance_update, enemy_sync, enemy_respawn, host_assigned, player_left, room_list, room_full
-const HTTP_BODY_SIZE_LIMIT = '16kb';
+const HTTP_BODY_SIZE_LIMIT = '5mb';
 const WS_MAX_ENEMY_SYNC_COUNT = 64;
 const WS_MAX_CONNECTIONS_PER_IP = 5;
 
