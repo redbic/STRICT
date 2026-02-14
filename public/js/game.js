@@ -42,6 +42,7 @@ class Game {
         this.damageNumbers = [];
         this.deathParticles = [];
 
+        this.activeMinigame = null; // TankGame or CardGame controller
         this.enemies = [];
         this.projectiles = []; // Projectile weapon system
         this.hitSparks = []; // Visual effects for projectile hits
@@ -78,6 +79,11 @@ class Game {
         this.handleKeyDown = (e) => {
             const key = normalizeKey(e);
             this.keys[key] = true;
+
+            // During card game takeover, block normal game input
+            if (this.activeMinigame && this.activeMinigame.takeover) {
+                return;
+            }
 
             // Handle respawn when dead
             if (key === ' ' && this.localPlayer && this.localPlayer.isDead) {
@@ -161,6 +167,9 @@ class Game {
                 return;
             }
             if (e.button !== 0 || !this.localPlayer) return;
+
+            // Block firing during minigame takeover (card game handles its own input)
+            if (this.activeMinigame && this.activeMinigame.takeover) return;
 
             // Block firing when dead
             if (this.localPlayer.isDead) return;
@@ -344,12 +353,29 @@ class Game {
         }
 
         this.gameStarted = true;
+
+        // Minigame lifecycle: detect ruleset and create controller
+        if (this.activeMinigame) {
+            this.activeMinigame.destroy();
+            this.activeMinigame = null;
+        }
+        if (this.zone && this.zone.ruleset === 'tanks' && typeof TankGame !== 'undefined') {
+            this.activeMinigame = new TankGame(this);
+        } else if (this.zone && this.zone.ruleset === 'cardgame' && typeof CardGame !== 'undefined') {
+            this.activeMinigame = new CardGame(this);
+        }
     }
     
     update() {
         if (!this.gameStarted) return;
 
         const frameDt = this.deltaTime || 1/60;
+
+        // Minigame takeover: delegate entirely and skip normal update
+        if (this.activeMinigame && this.activeMinigame.takeover) {
+            this.activeMinigame.update(frameDt);
+            return;
+        }
 
         // Hit stop - freeze all game logic for a brief moment on impact
         if (this.hitStop.timer > 0) {
@@ -477,6 +503,11 @@ class Game {
         
         // Handle portals
         this.handlePortalTransitions();
+
+        // Additive minigame update (tanks — layers on top of normal game loop)
+        if (this.activeMinigame && !this.activeMinigame.takeover) {
+            this.activeMinigame.update(frameDt);
+        }
 
         // No end screen during exploration
     }
@@ -1043,6 +1074,12 @@ class Game {
         // Clear canvas (defensive programming in case zone doesn't fill entire canvas)
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
+        // Minigame takeover: delegate draw entirely
+        if (this.activeMinigame && this.activeMinigame.takeover) {
+            this.activeMinigame.draw(this.ctx, this.cameraX, this.cameraY);
+            return;
+        }
+
         // Draw zone
         if (this.zone) {
             this.zone.draw(this.ctx, this.cameraX, this.cameraY);
@@ -1094,6 +1131,11 @@ class Game {
         this.drawHitSparks();
         this.drawDeathParticles();
         this.drawDamageNumbers();
+
+        // Additive minigame draw (tanks — renders on top of normal game)
+        if (this.activeMinigame && !this.activeMinigame.takeover) {
+            this.activeMinigame.draw(this.ctx, this.cameraX, this.cameraY);
+        }
 
         // Apply darkness overlay for The Gallery (ruleset: darkness)
         if (this.zone && this.zone.ruleset === 'darkness' && this.localPlayer) {
@@ -1256,6 +1298,12 @@ class Game {
     destroy() {
         // Stop game loop
         this.stop();
+
+        // Clean up active minigame
+        if (this.activeMinigame) {
+            this.activeMinigame.destroy();
+            this.activeMinigame = null;
+        }
 
         // Destroy PixiJS renderer
         if (pixiRenderer) {

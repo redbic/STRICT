@@ -1,0 +1,22 @@
+{
+  "name": "tanks",
+  "width": 960,
+  "height": 960,
+  "startX": 480,
+  "startY": 880,
+  "totalLevels": 1,
+  "ruleset": "tanks",
+  "floor": {
+    "width": 20,
+    "height": 20,
+    "tiles": [
+    ]
+  },
+  "walls": [],
+  "portals": [
+    { "id": "hallway", "x": 448, "y": 920, "width": 64, "height": 40, "label": "EXIT" }
+  ],
+  "enemies": [],
+  "items": [],
+  "npcs": []
+}

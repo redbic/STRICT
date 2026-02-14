@@ -93,6 +93,35 @@ const CONFIG = {
   DAMAGE_NUMBER_SPEED: 60,           // Upward float speed (pixels/sec)
   DEATH_PARTICLE_COUNT: 12,          // Particles spawned on enemy death
   DEATH_PARTICLE_LIFETIME: 0.6,      // Particle lifetime (seconds)
+
+  // ===================
+  // Tank Game (Room 1)
+  // ===================
+  TANK_ENEMY_SPEED: 60,              // Tank enemy patrol speed (px/s)
+  TANK_ENEMY_HP: 50,                 // Standard tank HP
+  TANK_ENEMY_FIRE_COOLDOWN: 2.5,     // Seconds between shots
+  TANK_ENEMY_PROJECTILE_SPEED: 250,  // Enemy bullet speed (px/s)
+  TANK_ENEMY_PROJECTILE_BOUNCES: 2,  // Ricochet count for enemy bullets
+  TANK_ENEMY_PROJECTILE_DAMAGE: 25,  // Damage per enemy bullet
+  TANK_WAVE_DELAY: 3.0,              // Seconds between waves
+  TANK_BODY_WIDTH: 28,               // Tank body width (px)
+  TANK_BODY_HEIGHT: 22,              // Tank body height (px)
+  TANK_BOSS_HP: 200,                 // Boss tank hit points
+  TANK_BOSS_FIRE_COOLDOWN: 1.5,      // Boss fires faster
+  TANK_BOSS_SPREAD_ANGLE: 0.4,       // Triple-shot spread (radians)
+  TANK_CRATE_HP: 3,                  // Hits to destroy a crate
+  TANK_HEALTH_DROP_CHANCE: 0.3,      // 30% chance crate drops health
+  TANK_HEALTH_DROP_AMOUNT: 25,       // HP restored by health pickup
+
+  // ===================
+  // Card Game (Room 2)
+  // ===================
+  CARD_BOARD_LANES: 4,               // Number of board lanes
+  CARD_HAND_SIZE: 4,                 // Cards drawn per turn
+  CARD_STARTING_HP: 20,              // Starting HP for both sides
+  CARD_ANIMATION_SPEED: 0.3,         // Card animation duration (s)
+  CARD_LOSS_COIN_PENALTY: 10,        // Coins lost on defeat
+  CARD_WIN_COIN_REWARD: 50,          // Coins earned on victory
 };
 
 // Make CONFIG available globally for non-module scripts
