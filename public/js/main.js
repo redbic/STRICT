@@ -42,10 +42,10 @@ function initCharacterSelector() {
         option.className = 'character-option' + (i === gameState.selectedCharacter ? ' selected' : '');
         option.dataset.character = i;
 
-        // Create canvas for character preview
+        // Create canvas for character preview (matches .character-option 64x80)
         const canvas = document.createElement('canvas');
-        canvas.width = 48;  // 16 * 3 scale
-        canvas.height = 64; // 32 * 2 scale (partial height for preview)
+        canvas.width = 56;
+        canvas.height = 72;
         option.appendChild(canvas);
 
         // Draw character preview
@@ -70,7 +70,7 @@ function drawCharacterPreview(canvas, characterNum) {
         ctx.arc(canvas.width / 2, canvas.height / 2, 16, 0, Math.PI * 2);
         ctx.fill();
         ctx.fillStyle = '#333';
-        ctx.font = '14px Arial';
+        ctx.font = "14px 'IBM Plex Sans', sans-serif";
         ctx.textAlign = 'center';
         ctx.fillText(characterNum, canvas.width / 2, canvas.height / 2 + 5);
         return;
@@ -761,6 +761,15 @@ async function startGame(zoneName) {
 
     showScreen('game');
     gameState.game.start();
+
+    // Auto-collapse controls panel after 15 seconds
+    const controlsEl = document.getElementById('controlsInfo');
+    if (controlsEl) {
+        controlsEl.classList.remove('collapsed');
+        setTimeout(() => {
+            controlsEl.classList.add('collapsed');
+        }, 15000);
+    }
 
     // Initialize chat system
     initializeChat();
