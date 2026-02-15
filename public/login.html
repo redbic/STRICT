@@ -3,10 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - STRICT1000</title>
+    <title>Login - The Hotel</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>%E2%9A%94%EF%B8%8F</text></svg>">
     <link rel="stylesheet" href="/css/style.css">
     <style>
+        body {
+            overflow: hidden;
+        }
+
         .login-container {
             display: flex;
             flex-direction: column;
@@ -14,90 +18,192 @@
             justify-content: center;
             min-height: 100vh;
             padding: 20px;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            background:
+                radial-gradient(ellipse at 50% 30%, rgba(255, 251, 220, 0.12) 0%, transparent 60%),
+                linear-gradient(180deg,
+                    var(--color-off-white) 0%,
+                    var(--color-beige) 50%,
+                    #c0b498 100%
+                );
+            position: relative;
+        }
+
+        /* Vignette */
+        .login-container::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            background: radial-gradient(
+                ellipse at center,
+                transparent 30%,
+                rgba(60, 50, 40, 0.35) 100%
+            );
         }
 
         .login-box {
-            background: rgba(26, 26, 46, 0.95);
-            border: 2px solid #e94560;
-            padding: 40px;
-            max-width: 400px;
+            position: relative;
+            z-index: 1;
+            background: var(--surface-panel);
+            border: 1px solid var(--border-mid);
+            border-radius: var(--radius-md);
+            padding: 48px 44px 40px;
+            max-width: 380px;
             width: 100%;
             text-align: center;
-            box-shadow: 0 0 40px rgba(233, 69, 96, 0.3);
+            box-shadow:
+                0 1px 0 rgba(255, 255, 255, 0.4) inset,
+                0 8px 32px rgba(80, 70, 55, 0.18),
+                0 2px 8px rgba(80, 70, 55, 0.12);
+            backdrop-filter: blur(8px);
+        }
+
+        /* Top edge catch-light */
+        .login-box::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255, 251, 230, 0.6), transparent);
+            border-radius: var(--radius-md) var(--radius-md) 0 0;
         }
 
         .login-title {
-            font-size: 2.5rem;
-            color: #e94560;
-            text-shadow: 0 0 30px #e94560;
-            margin-bottom: 10px;
+            font-family: var(--font-display);
+            font-size: 2rem;
+            font-weight: 400;
+            color: var(--color-text-muted);
             letter-spacing: 4px;
-            font-family: 'Courier New', monospace;
-            font-weight: bold;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+
+        .login-title::after {
+            content: '';
+            display: block;
+            width: 40px;
+            height: 1px;
+            background: var(--border-heavy);
+            margin: 14px auto 0;
         }
 
         .login-subtitle {
-            color: #888;
-            font-size: 1rem;
-            margin-bottom: 30px;
+            font-family: var(--font-body);
+            font-size: 11px;
+            font-weight: 400;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--color-text-light);
+            margin-top: 16px;
+            margin-bottom: 32px;
         }
 
         .login-input {
             width: 100%;
-            background: #0f0f23;
-            border: 1px solid #e94560;
-            color: #fff;
-            font-family: 'Courier New', monospace;
-            font-size: 1rem;
-            padding: 12px 16px;
-            border-radius: 4px;
-            margin-bottom: 20px;
+            font-family: var(--font-mono);
+            font-size: 14px;
+            padding: 14px 16px;
+            background: var(--surface-input);
+            border: 1px solid var(--border-mid);
+            border-radius: var(--radius-md);
+            color: var(--color-text-dark);
+            text-align: center;
+            letter-spacing: 3px;
+            margin-bottom: 18px;
             box-sizing: border-box;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .login-input::placeholder {
+            color: var(--color-text-light);
+            letter-spacing: 1px;
+            font-size: 13px;
         }
 
         .login-input:focus {
             outline: none;
-            box-shadow: 0 0 15px rgba(233, 69, 96, 0.5);
+            border-color: var(--color-baseboard);
+            box-shadow: 0 0 0 3px rgba(139, 115, 85, 0.12);
+            background: var(--color-fluorescent);
         }
 
         .login-btn {
             width: 100%;
-            background: #e94560;
-            border: none;
-            color: #fff;
-            font-family: 'Courier New', monospace;
-            font-size: 1rem;
-            font-weight: bold;
-            padding: 12px;
-            cursor: pointer;
+            font-family: var(--font-body);
+            font-size: 12px;
+            font-weight: 500;
             letter-spacing: 2px;
-            transition: all 0.3s;
+            text-transform: uppercase;
+            color: var(--color-cream);
+            padding: 14px;
+            cursor: pointer;
+            background:
+                linear-gradient(180deg,
+                    rgba(255, 255, 255, 0.08) 0%,
+                    transparent 40%,
+                    rgba(0, 0, 0, 0.05) 100%
+                ),
+                linear-gradient(135deg, var(--color-wood-panel) 0%, var(--color-baseboard) 100%);
+            border: 1px solid var(--color-wood-dark);
+            border-radius: var(--radius-sm);
+            box-shadow:
+                0 1px 0 rgba(255, 255, 255, 0.15) inset,
+                0 -1px 0 rgba(0, 0, 0, 0.1) inset,
+                0 2px 4px rgba(80, 70, 55, 0.2);
+            transition: all 0.15s ease;
         }
 
         .login-btn:hover {
-            box-shadow: 0 0 20px rgba(233, 69, 96, 0.7);
-            transform: translateY(-2px);
+            transform: translateY(-1px);
+            box-shadow:
+                0 1px 0 rgba(255, 255, 255, 0.15) inset,
+                0 -1px 0 rgba(0, 0, 0, 0.1) inset,
+                0 4px 12px rgba(80, 70, 55, 0.25);
+            background:
+                linear-gradient(180deg,
+                    rgba(255, 255, 255, 0.12) 0%,
+                    transparent 40%,
+                    rgba(0, 0, 0, 0.03) 100%
+                ),
+                linear-gradient(135deg, #b08a6a 0%, #9b8365 100%);
+        }
+
+        .login-btn:active {
+            transform: translateY(1px);
+            box-shadow:
+                0 -1px 0 rgba(255, 255, 255, 0.1) inset,
+                0 1px 0 rgba(0, 0, 0, 0.15) inset,
+                0 1px 2px rgba(80, 70, 55, 0.15);
         }
 
         .error-message {
-            color: #ff6b6b;
-            font-size: 0.9rem;
-            margin-top: 15px;
+            font-family: var(--font-mono);
+            color: var(--color-exit-red);
+            font-size: 12px;
+            letter-spacing: 0.5px;
+            margin-top: 16px;
             display: none;
         }
 
         .error-message.show {
             display: block;
+            animation: deathFadeIn 0.3s ease-out;
+        }
+
+        @keyframes deathFadeIn {
+            0% { opacity: 0; transform: translateY(4px); }
+            100% { opacity: 1; transform: translateY(0); }
         }
 
         @media (max-width: 480px) {
             .login-box {
-                padding: 30px 20px;
+                padding: 36px 24px 32px;
             }
 
             .login-title {
-                font-size: 2rem;
+                font-size: 1.6rem;
                 letter-spacing: 2px;
             }
         }
@@ -106,19 +212,19 @@
 <body>
     <div class="login-container">
         <div class="login-box">
-            <div class="login-title">STRICT1000</div>
-            <div class="login-subtitle">Password Protected</div>
+            <div class="login-title">The Hotel</div>
+            <div class="login-subtitle">Password Required</div>
 
             <form id="login-form">
                 <input
                     type="password"
                     class="login-input"
                     id="password"
-                    placeholder="Enter password..."
+                    placeholder="Enter password"
                     autocomplete="off"
                     autofocus
                 >
-                <button type="submit" class="login-btn">ENTER</button>
+                <button type="submit" class="login-btn">Enter</button>
                 <div class="error-message" id="error-message">Incorrect password</div>
             </form>
         </div>
@@ -142,14 +248,12 @@
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({ password }),
-                    credentials: 'same-origin', // Required to receive session cookie
+                    credentials: 'same-origin',
                 });
 
                 if (response.ok) {
-                    // Redirect to home page on success
                     window.location.href = '/';
                 } else {
-                    // Show error message
                     errorMessage.classList.add('show');
                     passwordInput.value = '';
                     passwordInput.focus();
