@@ -15,7 +15,6 @@ class TankGame {
         this.currentWave = 0;
         this.waveActive = false;
         this.waveDelay = 0;
-        this.gameOver = false;
         this.victory = false;
         this.waveBanner = { text: '', timer: 0 };
 
@@ -132,12 +131,8 @@ class TankGame {
         if (data.wave !== undefined) this.currentWave = data.wave;
         if (data.waveActive !== undefined) this.waveActive = data.waveActive;
         if (data.waveDelay !== undefined) this.waveDelay = data.waveDelay;
-        if (data.gameOver !== undefined) {
-            if (data.gameOver && !this.gameOver) {
-                this.waveBanner = { text: 'MISSION FAILED', timer: 999 };
-            }
-            this.gameOver = data.gameOver;
-        }
+        // gameOver removed - player death now handled by main game system
+        // When player dies, main game shows death screen and handles respawn to hub
         if (data.victory !== undefined) {
             if (data.victory && !this.victory) {
                 this.waveBanner = { text: 'VICTORY!', timer: 5.0 };
@@ -210,7 +205,6 @@ class TankGame {
         this.tankEnemies = [];
         this.tankProjectiles = [];
         this.healthPickups = [];
-        this.gameOver = false;
         this.victory = false;
         this.currentWave = 0;
         this.waveActive = false;
@@ -294,16 +288,10 @@ class TankGame {
             if (tank.flashTimer > 0) tank.flashTimer -= dt;
         });
 
-        // Restart/exit input
-        if ((this.gameOver || this.victory) && this.game.keys[' ']) {
-            if (this.gameOver) {
-                if (this.game.onTankRestart) {
-                    this.game.onTankRestart();
-                }
-            } else if (this.victory) {
-                if (this.game.onPortalEnter) {
-                    this.game.onPortalEnter('hallway');
-                }
+        // Victory exit input - gameOver is handled by main game death screen now
+        if (this.victory && this.game.keys[' ']) {
+            if (this.game.onPortalEnter) {
+                this.game.onPortalEnter('hallway');
             }
         }
     }
@@ -482,7 +470,9 @@ class TankGame {
             ctx.restore();
         }
 
-        if (this.waveActive && !this.gameOver && !this.victory) {
+        // Don't show enemy count if player is dead (main game shows death screen)
+        const playerDead = this.game.localPlayer && this.game.localPlayer.isDead;
+        if (this.waveActive && !playerDead && !this.victory) {
             const remaining = this.tankEnemies.filter(t => t.alive).length;
             ctx.save();
             ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
@@ -494,20 +484,7 @@ class TankGame {
             ctx.restore();
         }
 
-        if (this.gameOver) {
-            ctx.save();
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-            ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-            ctx.fillStyle = '#b04040';
-            ctx.font = 'bold 40px monospace';
-            ctx.textAlign = 'center';
-            ctx.fillText('MISSION FAILED', ctx.canvas.width / 2, ctx.canvas.height / 2 - 20);
-            ctx.fillStyle = '#e0d8c8';
-            ctx.font = '18px monospace';
-            ctx.fillText('Press SPACE to retry', ctx.canvas.width / 2, ctx.canvas.height / 2 + 20);
-            ctx.restore();
-        }
-
+        // Victory screen (death is handled by main game system)
         if (this.victory) {
             ctx.save();
             ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';

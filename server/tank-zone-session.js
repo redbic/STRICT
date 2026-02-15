@@ -57,7 +57,6 @@ class TankZoneSession {
     this.currentWave = 0;
     this.waveActive = false;
     this.waveDelay = TANK.WAVE_DELAY;
-    this.gameOver = false;
     this.victory = false;
 
     // Add crate walls to collision
@@ -196,7 +195,6 @@ class TankZoneSession {
       wave: this.currentWave,
       waveActive: this.waveActive,
       waveDelay: this.waveDelay,
-      gameOver: this.gameOver,
       victory: this.victory,
     };
   }
@@ -256,7 +254,6 @@ class TankZoneSession {
     this.tanks = [];
     this.projectiles = [];
     this.healthPickups = [];
-    this.gameOver = false;
     this.victory = false;
     this.currentWave = 0;
     this.waveActive = false;
@@ -285,8 +282,8 @@ class TankZoneSession {
   tick() {
     const dt = TANK.TICK_DT;
 
-    if (this.gameOver || this.victory) {
-      // Still broadcast state so late joiners see the end screen
+    if (this.victory) {
+      // Still broadcast state so late joiners see the victory screen
       this._broadcastTankSync();
       return;
     }
@@ -328,20 +325,8 @@ class TankZoneSession {
       }
     }
 
-    // Check game over (all players dead)
-    if (!this.gameOver && !this.victory && this.players.size > 0) {
-      let allDead = true;
-      for (const [, p] of this.players) {
-        if (!p.isDead && p.hp > 0) { allDead = false; break; }
-      }
-      if (allDead) {
-        this.gameOver = true;
-        this._broadcastToZone({
-          type: 'tank_game_over',
-          reason: 'death',
-        });
-      }
-    }
+    // Player death is handled by main game client-side (respawn to hub)
+    // Server only manages victory condition (all waves cleared)
 
     // Broadcast full state
     this._broadcastTankSync();
@@ -755,7 +740,6 @@ class TankZoneSession {
       wave: this.currentWave,
       waveActive: this.waveActive,
       waveDelay: this.waveDelay,
-      gameOver: this.gameOver,
       victory: this.victory,
     });
   }
