@@ -20,6 +20,7 @@ const {
 const { createPool } = require('./server/db/pool');
 const { broadcastToZone, safeSend } = require('./server/websocket/broadcast');
 const { ZoneSession } = require('./server/zone-session');
+const { TankZoneSession } = require('./server/tank-zone-session');
 require('dotenv').config();
 
 const app = express();
@@ -58,11 +59,15 @@ const WS_MESSAGE_TYPES = new Set([
   'player_death',
   'player_fire',
   'player_chat',
+  'tank_restart',
+  'tank_crate_damage',
 ]);
 // Outbound message types (server -> client):
 // room_update, player_state, game_start, zone_enter, player_zone,
 // balance_update, enemy_sync, enemy_state_update, enemy_killed_sync, enemy_respawn,
 // enemy_attack, host_assigned, player_left, room_list, room_full, player_fire, chat_message
+// tank_sync, tank_wave_start, tank_killed, tank_crate_destroyed, tank_player_hit,
+// tank_pickup_collected, tank_game_over, tank_state_reset
 const HTTP_BODY_SIZE_LIMIT = '5mb';
 const WS_MAX_ENEMY_SYNC_COUNT = 64;
 const WS_MAX_CONNECTIONS_PER_IP = 5;
@@ -482,6 +487,8 @@ wss.on('connection', (ws, request) => {
       case 'player_death': handlePlayerDeath(ws, data); break;
       case 'player_fire':  handlePlayerFire(ws, data); break;
       case 'player_chat':  handlePlayerChat(ws, data); break;
+      case 'tank_restart':     handleTankRestart(ws); break;
+      case 'tank_crate_damage': handleTankCrateDamage(ws, data); break;
       default: break;
     }
   });
@@ -674,11 +681,16 @@ async function handleZoneEnter(ws, data) {
 
   if (!session) {
     const zoneData = await loadZoneData(zoneId);
-    session = new ZoneSession(ws.roomId, zoneId, zoneData || {}, {
-      onEnemyDeath: handleZoneEnemyDeath,
-    });
+    const sessionDeps = { onEnemyDeath: handleZoneEnemyDeath };
+
+    if (zoneData && zoneData.ruleset === 'tanks') {
+      session = new TankZoneSession(ws.roomId, zoneId, zoneData, sessionDeps);
+      debugLog('zone_enter', `created tank zone session for ${zoneId}`);
+    } else {
+      session = new ZoneSession(ws.roomId, zoneId, zoneData || {}, sessionDeps);
+      debugLog('zone_enter', `created zone session for ${zoneId} with ${session.enemies.length} enemies`);
+    }
     room.zoneSessions.set(zoneId, session);
-    debugLog('zone_enter', `created zone session for ${zoneId} with ${session.enemies.length} enemies`);
   }
 
   // Add player to zone session
@@ -698,13 +710,20 @@ async function handleZoneEnter(ws, data) {
     .map(p => ({ id: p.id, username: p.username, zone: p.zone }));
 
   // Send zone enter with current enemy state from zone session
-  safeSend(ws, {
+  const zoneEnterMsg = {
     type: 'zone_enter',
     zoneId,
     playerId: ws.playerId,
     zonePlayers: zoneMates,
     enemies: aliveEnemies,
-  });
+  };
+
+  // Include tank-specific state for tank zones
+  if (session.getTankState) {
+    zoneEnterMsg.tankState = session.getTankState();
+  }
+
+  safeSend(ws, zoneEnterMsg);
 }
 
 function handleEnemyKilled(ws, data) {
@@ -749,18 +768,54 @@ function handleEnemyDamage(ws, data) {
 }
 
 /**
- * Handle enemy death from ZoneSession - awards coins to killer
- * Called by ZoneSession.deps.onEnemyDeath
+ * Handle enemy death from ZoneSession/TankZoneSession - awards coins to killer
+ * Called by session.deps.onEnemyDeath
+ * @param {string} roomId
+ * @param {string} zoneId
+ * @param {string} enemyId
+ * @param {string} killerUsername
+ * @param {WebSocket} killerWs
+ * @param {number} [reward] - Optional custom reward amount (defaults to ENEMY_KILL_REWARD)
  */
-async function handleZoneEnemyDeath(roomId, zoneId, enemyId, killerUsername, killerWs) {
-  // Award coins to killer
+async function handleZoneEnemyDeath(roomId, zoneId, enemyId, killerUsername, killerWs, reward) {
+  const amount = typeof reward === 'number' ? reward : ENEMY_KILL_REWARD;
   const newBalance = await currency.addBalance(
-    pool, killerUsername, ENEMY_KILL_REWARD, 'enemy_kill',
+    pool, killerUsername, amount, 'enemy_kill',
     { game: 'strict1000', enemy: enemyId, zone: zoneId }
   );
   if (newBalance !== null && killerWs) {
     safeSend(killerWs, { type: 'balance_update', balance: newBalance });
   }
+}
+
+// --- Tank minigame handlers ---
+
+function handleTankRestart(ws) {
+  if (!ws.roomId) return;
+  const room = rooms.getRoom(ws.roomId);
+  if (!room) return;
+  const player = room.players.find(p => p.id === ws.playerId);
+  if (!player) return;
+
+  const session = room.zoneSessions && room.zoneSessions.get(player.zone);
+  if (!session || !session.restart) return;
+
+  session.restart();
+}
+
+function handleTankCrateDamage(ws, data) {
+  if (!ws.roomId || !data.crateId || typeof data.damage !== 'number') return;
+  if (data.damage < 0 || data.damage > 10) return;
+
+  const room = rooms.getRoom(ws.roomId);
+  if (!room) return;
+  const player = room.players.find(p => p.id === ws.playerId);
+  if (!player) return;
+
+  const session = room.zoneSessions && room.zoneSessions.get(player.zone);
+  if (!session || !session.applyCrateDamage) return;
+
+  session.applyCrateDamage(data.crateId, data.damage);
 }
 
 function handlePlayerFire(ws, data) {

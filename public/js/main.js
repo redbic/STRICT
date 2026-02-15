@@ -317,6 +317,11 @@ function setupNetworkHandlers() {
                 await gameState.game.transitionZone(data.zoneId, zonePlayers, gameState.networkManager.playerId, serverEnemies);
             }
 
+            // Apply initial tank state if entering a tank zone
+            if (data.tankState && gameState.game.activeMinigame && gameState.game.activeMinigame.applyServerSync) {
+                gameState.game.activeMinigame.applyServerSync(data.tankState);
+            }
+
             // Update our own zone in currentRoomPlayers
             const selfInRoster = gameState.currentRoomPlayers.find(p => p.id === gameState.networkManager.playerId);
             if (selfInRoster) {
@@ -412,6 +417,17 @@ function setupNetworkHandlers() {
             if (data.maxHp !== undefined) {
                 enemy.maxHp = data.maxHp;
             }
+            return;
+        }
+
+        // Also check tank minigame enemies
+        if (gameState.game.activeMinigame && gameState.game.activeMinigame.tankEnemies) {
+            const tank = gameState.game.activeMinigame.tankEnemies.find(t => t.id === data.enemyId);
+            if (tank) {
+                tank.hp = data.hp;
+                if (data.maxHp !== undefined) tank.maxHp = data.maxHp;
+                tank.flashTimer = 0.15; // Visual damage flash
+            }
         }
     };
 
@@ -485,6 +501,76 @@ function setupNetworkHandlers() {
         }
         // Add to chat history
         appendChatMessage(data.username, data.text);
+    };
+
+    // --- Tank minigame network callbacks ---
+
+    gameState.networkManager.onTankSync = (data) => {
+        if (gameState.game && gameState.game.activeMinigame && gameState.game.activeMinigame.tankEnemies) {
+            gameState.game.activeMinigame.applyServerSync(data);
+        }
+    };
+
+    gameState.networkManager.onTankWaveStart = (data) => {
+        if (gameState.game && gameState.game.activeMinigame && gameState.game.activeMinigame.showWaveBanner) {
+            gameState.game.activeMinigame.showWaveBanner(data.wave, data.isBoss);
+        }
+    };
+
+    gameState.networkManager.onTankKilled = (data) => {
+        if (!gameState.game) return;
+        // Death effects at tank position
+        if (data.x !== undefined && data.y !== undefined) {
+            gameState.game.spawnDeathParticles(data.x, data.y);
+            gameState.game.triggerScreenShake(CONFIG.SCREEN_SHAKE_ENEMY_KILL, 0.1);
+        }
+        // Immediately remove from local array (next tank_sync will also exclude it)
+        if (gameState.game.activeMinigame && gameState.game.activeMinigame.tankEnemies && data.tankId) {
+            gameState.game.activeMinigame.tankEnemies = gameState.game.activeMinigame.tankEnemies.filter(t => t.id !== data.tankId);
+        }
+    };
+
+    gameState.networkManager.onTankPlayerHit = (data) => {
+        if (!gameState.game || !gameState.game.localPlayer) return;
+        if (!gameState.networkManager || data.playerId !== gameState.networkManager.playerId) return;
+        gameState.game.localPlayer.takeDamage(data.damage);
+    };
+
+    gameState.networkManager.onTankPickupCollected = (data) => {
+        if (!gameState.game || !gameState.game.activeMinigame) return;
+        gameState.game.activeMinigame.handlePickupCollected(data);
+        // Heal local player if this pickup was for us
+        if (data.playerId === gameState.networkManager.playerId && gameState.game.localPlayer) {
+            gameState.game.localPlayer.hp = Math.min(
+                gameState.game.localPlayer.maxHp,
+                gameState.game.localPlayer.hp + (data.healAmount || 25)
+            );
+        }
+    };
+
+    gameState.networkManager.onTankCrateDestroyed = (data) => {
+        if (gameState.game && gameState.game.activeMinigame && gameState.game.activeMinigame.handleCrateDestroyed) {
+            gameState.game.activeMinigame.handleCrateDestroyed(data);
+        }
+    };
+
+    gameState.networkManager.onTankGameOver = (data) => {
+        if (gameState.game && gameState.game.activeMinigame && gameState.game.activeMinigame.applyServerSync) {
+            // Set game over/victory state
+            if (data.reason === 'victory') {
+                gameState.game.activeMinigame.victory = true;
+                gameState.game.activeMinigame.waveBanner = { text: 'VICTORY!', timer: 5.0 };
+            } else {
+                gameState.game.activeMinigame.gameOver = true;
+                gameState.game.activeMinigame.waveBanner = { text: 'MISSION FAILED', timer: 999 };
+            }
+        }
+    };
+
+    gameState.networkManager.onTankStateReset = (data) => {
+        if (gameState.game && gameState.game.activeMinigame && gameState.game.activeMinigame.handleServerReset) {
+            gameState.game.activeMinigame.handleServerReset(data);
+        }
     };
 }
 
@@ -752,6 +838,18 @@ async function startGame(zoneName) {
     gameState.game.onPlayerFire = (x, y, angle) => {
         if (gameState.networkManager && gameState.networkManager.connected) {
             gameState.networkManager.sendPlayerFire(x, y, angle);
+        }
+    };
+
+    // Tank minigame callbacks
+    gameState.game.onTankRestart = () => {
+        if (gameState.networkManager && gameState.networkManager.connected) {
+            gameState.networkManager.sendTankRestart();
+        }
+    };
+    gameState.game.onTankCrateDamage = (crateId, damage, fromX, fromY) => {
+        if (gameState.networkManager && gameState.networkManager.connected) {
+            gameState.networkManager.sendTankCrateDamage(crateId, damage, fromX, fromY);
         }
     };
 

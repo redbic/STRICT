@@ -52,6 +52,8 @@ class Game {
         this.onPlayerDeath = null; // Callback for when the local player dies
         this.onPlayerFire = null; // Callback for when local player fires (to sync to others)
         this.onChatMessage = null; // Callback for when a chat message is received
+        this.onTankRestart = null; // Callback for tank game restart request
+        this.onTankCrateDamage = null; // Callback for sending crate damage to server (crateId, damage, fromX, fromY)
 
         // Screen flash effect for damage feedback (muted for liminal aesthetic)
         this.screenFlash = { active: false, timer: 0, color: 'rgba(176, 64, 64, 0.25)' };
@@ -596,23 +598,57 @@ class Game {
 
             // Check enemy collisions (skip remote projectiles — they are visual only)
             if (proj.alive && proj.damage > 0) {
+                // Standard zone enemies
                 for (const enemy of this.enemies) {
                     if (this.checkProjectileHit(proj, enemy)) {
-                        // Create hit spark effect
                         this.createHitSpark(proj.x, proj.y);
-
-                        // Game feel: damage number, shake, hit stop, knockback (local prediction)
                         this.spawnDamageNumber(proj.x, proj.y - 10, proj.damage);
                         this.triggerScreenShake(CONFIG.SCREEN_SHAKE_DAMAGE_DEALT, 0.08);
                         this.triggerHitStop(CONFIG.HIT_STOP_DURATION);
                         enemy.applyKnockback(proj.x, proj.y, CONFIG.KNOCKBACK_FORCE);
-
-                        // Server-authoritative: send damage + hit position for knockback
                         if (this.onEnemyDamage) {
                             this.onEnemyDamage(enemy.id, proj.damage, proj.x, proj.y);
                         }
                         proj.alive = false;
                         break;
+                    }
+                }
+
+                // Tank minigame enemies and crates (client-side prediction for visual feedback)
+                if (proj.alive && this.activeMinigame && this.activeMinigame.tankEnemies) {
+                    // Check tank enemies
+                    for (const tank of this.activeMinigame.tankEnemies) {
+                        if (!tank.alive) continue;
+                        if (this.checkProjectileHit(proj, tank)) {
+                            this.createHitSpark(proj.x, proj.y);
+                            this.spawnDamageNumber(proj.x, proj.y - 10, proj.damage);
+                            this.triggerScreenShake(CONFIG.SCREEN_SHAKE_DAMAGE_DEALT, 0.08);
+                            this.triggerHitStop(CONFIG.HIT_STOP_DURATION);
+                            // Send damage to server via existing enemy_damage flow
+                            if (this.onEnemyDamage) {
+                                this.onEnemyDamage(tank.id, proj.damage, proj.x, proj.y);
+                            }
+                            proj.alive = false;
+                            break;
+                        }
+                    }
+
+                    // Check crates
+                    if (proj.alive && this.activeMinigame.crates) {
+                        for (const crate of this.activeMinigame.crates) {
+                            if (!crate.alive) continue;
+                            if (this.checkProjectileHit(proj, crate)) {
+                                this.createHitSpark(proj.x, proj.y);
+                                this.spawnDamageNumber(proj.x, proj.y - 10, proj.damage);
+                                this.triggerScreenShake(CONFIG.SCREEN_SHAKE_DAMAGE_DEALT, 0.08);
+                                // Send crate damage to server
+                                if (this.onTankCrateDamage) {
+                                    this.onTankCrateDamage(crate.id, proj.damage, proj.x, proj.y);
+                                }
+                                proj.alive = false;
+                                break;
+                            }
+                        }
                     }
                 }
             }
