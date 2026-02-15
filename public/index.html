@@ -34,6 +34,10 @@
                 <button id="confirmNameBtn" class="menu-btn">Confirm</button>
                 <button id="multiPlayerBtn" class="menu-btn">Create Lobby</button>
             </div>
+            <div id="connectionStatus" class="connection-status" style="display: none;">
+                <span class="status-icon">⚠️</span>
+                <span class="status-text">Connecting to server...</span>
+            </div>
             <div id="roomBrowser" class="room-browser" style="display:none;">
                 <h3>Available Lobbies</h3>
                 <div id="roomList" class="room-list">
@@ -103,6 +107,31 @@
                     <button id="chatSendBtn" class="chat-send-btn">Send</button>
                 </div>
             </div>
+
+            <!-- Audio Control Panel -->
+            <div id="audioPanel" class="audio-panel">
+                <button id="audioToggleBtn" class="audio-toggle-btn" title="Audio Settings">🔊</button>
+                <div id="audioControls" class="audio-controls" style="display: none;">
+                    <div class="audio-control-group">
+                        <label>Master Volume</label>
+                        <input type="range" id="masterVolumeSlider" min="0" max="100" value="80">
+                        <span id="masterVolumeValue">80%</span>
+                    </div>
+                    <div class="audio-control-group">
+                        <label>SFX Volume</label>
+                        <input type="range" id="sfxVolumeSlider" min="0" max="100" value="100">
+                        <span id="sfxVolumeValue">100%</span>
+                    </div>
+                    <div class="audio-control-group">
+                        <label>Music Volume</label>
+                        <input type="range" id="musicVolumeSlider" min="0" max="100" value="40">
+                        <span id="musicVolumeValue">40%</span>
+                    </div>
+                    <div class="audio-control-group">
+                        <button id="muteAllBtn" class="mute-btn">Mute All</button>
+                    </div>
+                </div>
+            </div>
         </div>
         <canvas id="gameCanvas"></canvas>
     </div>
@@ -147,6 +176,6 @@
     <script src="/js/npc.js"></script>
     <script src="/js/track.js"></script>
     <script src="/js/network.js"></script>
-    <script src="/js/main.js"></script>
+    <script type="module" src="/js/main.js"></script>
 </body>
 </html>

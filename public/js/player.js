@@ -636,6 +636,14 @@ class Player {
         this.muzzleFlash.active = true;
         this.muzzleFlash.timer = this.muzzleFlash.duration;
 
+        // Play gun fire sound
+        if (window.gameState?.audioManager) {
+            gameState.audioManager.playSound('gun_fire', {
+                volume: CONFIG.AUDIO_GUN_FIRE_VOLUME,
+                pitchVariation: CONFIG.AUDIO_PITCH_VARIATION
+            });
+        }
+
         // Spawn projectile at barrel tip
         const spawnX = this.x + Math.cos(angle) * this.gun.barrelLength;
         const spawnY = this.y + Math.sin(angle) * this.gun.barrelLength;

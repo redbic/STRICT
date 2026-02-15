@@ -1,5 +1,7 @@
 // Main application logic
 // Uses centralized CONFIG from config/constants.js
+import { AudioManager } from './audio.js';
+
 const USERNAME_PATTERN = (typeof CONFIG !== 'undefined' && CONFIG.USERNAME_PATTERN)
   ? CONFIG.USERNAME_PATTERN
   : /^[A-Za-z0-9]([A-Za-z0-9 _-]*[A-Za-z0-9])?$/;
@@ -11,6 +13,7 @@ const MAX_USERNAME_LENGTH = (typeof CONFIG !== 'undefined' && CONFIG.MAX_USERNAM
 const gameState = {
     game: null,
     networkManager: null,
+    audioManager: null, // Audio system
     currentUsername: '',
     currentRoomPlayers: [],
     currentProfile: null,
@@ -107,15 +110,42 @@ function selectCharacter(num) {
 
 // Screen management
 function showScreen(screenId) {
+    const targetScreen = document.getElementById(screenId);
+    if (!targetScreen) {
+        console.error('Screen not found:', screenId);
+        return;
+    }
+
     document.querySelectorAll('.screen').forEach(screen => {
         screen.classList.remove('active');
     });
-    document.getElementById(screenId).classList.add('active');
+    targetScreen.classList.add('active');
 }
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
     setupEventListeners();
+
+    // Initialize audio system
+    gameState.audioManager = new AudioManager();
+    const audioInitialized = await gameState.audioManager.init();
+
+    if (audioInitialized) {
+        // Load all sound effects
+        await gameState.audioManager.loadSound('gun_fire', '/sounds/sfx/gun_fire.ogg');
+        await gameState.audioManager.loadSound('impact', '/sounds/sfx/impact.ogg');
+        await gameState.audioManager.loadSound('enemy_hurt', '/sounds/sfx/enemy_hurt.ogg');
+        await gameState.audioManager.loadSound('enemy_death', '/sounds/sfx/enemy_death.ogg');
+
+        // Load background music
+        await gameState.audioManager.loadMusic('combat_theme', '/sounds/music/combat_theme.ogg');
+
+        // Start background music with fade-in
+        gameState.audioManager.playMusic('combat_theme', {
+            loop: true,
+            fadeIn: CONFIG.MUSIC_FADE_DURATION || 2.0
+        });
+    }
 
     // Check for saved username
     const savedUsername = localStorage.getItem('username');
@@ -137,14 +167,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
         if (typeof initTilesets === 'function') {
             await initTilesets();
-            console.log('Tilesets initialized');
         }
         if (typeof initCharacterSprites === 'function') {
             await initCharacterSprites();
-            console.log('Character sprites initialized');
         }
     } catch (err) {
-        console.warn('Failed to load tilesets/sprites, will use fallback rendering:', err);
+        console.warn('Failed to load tilesets/sprites:', err.message);
     }
 
     // Initialize character selection grid after sprites are loaded
@@ -153,10 +181,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 function setupEventListeners() {
     const multiBtn = document.getElementById('multiPlayerBtn');
-    multiBtn.disabled = true;
+    if (multiBtn) multiBtn.disabled = true;
 
     document.getElementById('confirmNameBtn').addEventListener('click', async () => {
         const username = document.getElementById('username').value.trim();
+
         if (!username) {
             alert('Please enter your name');
             return;
@@ -169,6 +198,7 @@ function setupEventListeners() {
             alert('Username must start and end with alphanumeric characters and can only contain letters, numbers, spaces, underscores, and hyphens');
             return;
         }
+
         gameState.currentUsername = username;
         localStorage.setItem('username', username);
 
@@ -182,24 +212,21 @@ function setupEventListeners() {
         }).catch(err => console.error('Failed to register player:', err));
 
         multiBtn.disabled = false;
-        
-        // Start browsing for available rooms
         startRoomBrowsing();
     });
 
     // Main menu - Create new lobby
     document.getElementById('multiPlayerBtn').addEventListener('click', async () => {
         const username = document.getElementById('username').value.trim();
+
         if (!username) {
             alert('Please enter your name');
             return;
         }
         gameState.currentUsername = username;
 
-        // Stop browsing before joining
         stopRoomBrowsing();
 
-        // Initialize network
         if (!gameState.networkManager) {
             gameState.networkManager = new NetworkManager();
             try {
@@ -209,13 +236,14 @@ function setupEventListeners() {
                 const playerId = 'player-' + Math.random().toString(36).substring(2, 11);
 
                 gameState.networkManager.joinRoom(roomId, playerId, username, gameState.selectedCharacter);
-                
+
                 document.getElementById('roomCode').textContent = roomId;
-                
+
                 setupNetworkHandlers();
                 showScreen('lobby');
             } catch (error) {
-                alert('Failed to connect to server.');
+                console.error('Failed to connect:', error.message);
+                alert('Failed to connect to server: ' + error.message);
                 showScreen('menu');
             }
         }
@@ -232,7 +260,7 @@ function setupEventListeners() {
         }
         startGame('hub');
     });
-    
+
     document.getElementById('leaveLobbyBtn').addEventListener('click', () => {
         if (gameState.networkManager) {
             gameState.networkManager.leaveRoom();
@@ -255,7 +283,74 @@ function setupEventListeners() {
         // Resume room browsing
         startRoomBrowsing();
     });
-    
+
+    // Audio control panel
+    const audioToggleBtn = document.getElementById('audioToggleBtn');
+    const audioControls = document.getElementById('audioControls');
+    const masterSlider = document.getElementById('masterVolumeSlider');
+    const sfxSlider = document.getElementById('sfxVolumeSlider');
+    const musicSlider = document.getElementById('musicVolumeSlider');
+    const muteAllBtn = document.getElementById('muteAllBtn');
+
+    // Load saved volumes from localStorage
+    const savedMaster = localStorage.getItem('audio_master_volume');
+    const savedSFX = localStorage.getItem('audio_sfx_volume');
+    const savedMusic = localStorage.getItem('audio_music_volume');
+
+    if (savedMaster && masterSlider) {
+        masterSlider.value = parseFloat(savedMaster) * 100;
+        document.getElementById('masterVolumeValue').textContent = `${Math.round(parseFloat(savedMaster) * 100)}%`;
+    }
+    if (savedSFX && sfxSlider) {
+        sfxSlider.value = parseFloat(savedSFX) * 100;
+        document.getElementById('sfxVolumeValue').textContent = `${Math.round(parseFloat(savedSFX) * 100)}%`;
+    }
+    if (savedMusic && musicSlider) {
+        musicSlider.value = parseFloat(savedMusic) * 100;
+        document.getElementById('musicVolumeValue').textContent = `${Math.round(parseFloat(savedMusic) * 100)}%`;
+    }
+
+    // Apply saved volumes to audio manager if initialized
+    if (gameState.audioManager) {
+        if (savedMaster) gameState.audioManager.setMasterVolume(parseFloat(savedMaster));
+        if (savedSFX) gameState.audioManager.setSFXVolume(parseFloat(savedSFX));
+        if (savedMusic) gameState.audioManager.setMusicVolume(parseFloat(savedMusic));
+    }
+
+    audioToggleBtn?.addEventListener('click', () => {
+        if (audioControls) {
+            audioControls.style.display = audioControls.style.display === 'none' ? 'block' : 'none';
+        }
+    });
+
+    masterSlider?.addEventListener('input', (e) => {
+        const vol = e.target.value / 100;
+        gameState.audioManager?.setMasterVolume(vol);
+        document.getElementById('masterVolumeValue').textContent = `${e.target.value}%`;
+        localStorage.setItem('audio_master_volume', vol);
+    });
+
+    sfxSlider?.addEventListener('input', (e) => {
+        const vol = e.target.value / 100;
+        gameState.audioManager?.setSFXVolume(vol);
+        document.getElementById('sfxVolumeValue').textContent = `${e.target.value}%`;
+        localStorage.setItem('audio_sfx_volume', vol);
+    });
+
+    musicSlider?.addEventListener('input', (e) => {
+        const vol = e.target.value / 100;
+        gameState.audioManager?.setMusicVolume(vol);
+        document.getElementById('musicVolumeValue').textContent = `${e.target.value}%`;
+        localStorage.setItem('audio_music_volume', vol);
+    });
+
+    muteAllBtn?.addEventListener('click', () => {
+        const isMuted = gameState.audioManager?.toggleMute();
+        if (muteAllBtn) {
+            muteAllBtn.textContent = isMuted ? 'Unmute All' : 'Mute All';
+        }
+    });
+
 }
 
 function setupNetworkHandlers() {
@@ -435,6 +530,18 @@ function setupNetworkHandlers() {
         if (enemy) {
             gameState.game.spawnDeathParticles(enemy.x, enemy.y);
             gameState.game.triggerScreenShake(CONFIG.SCREEN_SHAKE_ENEMY_KILL, 0.1);
+
+            // Enhanced hit stop on kill only (server-authoritative)
+            gameState.game.triggerHitStop(CONFIG.HIT_STOP_KILL_DURATION);
+
+            // Play death sound with spatial audio
+            if (gameState.audioManager) {
+                const panAmount = gameState.game.calculatePan(enemy.x);
+                gameState.audioManager.playSound('enemy_death', {
+                    volume: CONFIG.AUDIO_ENEMY_DEATH_VOLUME,
+                    pan: panAmount
+                });
+            }
         }
 
         gameState.game.enemies = gameState.game.enemies.filter(e => e.id !== data.enemyId);
@@ -508,14 +615,12 @@ function updateHostStatus(hostId) {
     gameState.game.isHost = (gameState.networkManager.playerId === hostId);
 
     if (gameState.game.isHost && !wasHost) {
-        // Start enemy sync interval when becoming host
+        console.log('[Host] Became room host');
         startEnemySyncInterval();
     } else if (!gameState.game.isHost && wasHost) {
-        // Stop enemy sync interval when losing host status
         stopEnemySyncInterval();
     }
 
-    // Update zone host status
     updateZoneHostStatus();
 }
 
@@ -551,12 +656,10 @@ function updateZoneHostStatus() {
 
     // Start/stop enemy sync based on zone host status change
     if (gameState.game.isZoneHost && !wasZoneHost) {
-        console.log('Became zone host for zone:', localZone);
+        console.log('[Host] Became zone host for:', localZone);
         startEnemySyncInterval();
     } else if (!gameState.game.isZoneHost && wasZoneHost && !gameState.game.isHost) {
-        console.log('Lost zone host status - sending final enemy sync for handoff');
         // Send ONE final enemy sync to hand off position/AI state to the new authoritative player
-        // Note: HP is server-authoritative, so we don't need to include it
         if (gameState.networkManager && gameState.networkManager.connected && gameState.game.enemies) {
             gameState.networkManager.sendEnemySync(gameState.game.enemies.map(e => ({
                 id: e.id,
@@ -607,16 +710,38 @@ async function startRoomBrowsing() {
     const browserEl = document.getElementById('roomBrowser');
     if (browserEl) browserEl.style.display = 'block';
 
+    // Show connection status
+    const statusEl = document.getElementById('connectionStatus');
+    if (statusEl) {
+        statusEl.style.display = 'flex';
+        statusEl.classList.remove('connected');
+        statusEl.querySelector('.status-text').textContent = 'Connecting...';
+    }
+
     gameState.browseManager = new NetworkManager();
     try {
         await gameState.browseManager.connect();
+
+        // Update status to connected
+        if (statusEl) {
+            statusEl.classList.add('connected');
+            statusEl.querySelector('.status-icon').textContent = '✓';
+            statusEl.querySelector('.status-text').textContent = 'Connected';
+        }
+
         gameState.browseManager.onRoomList = (data) => {
             renderRoomList(data.rooms || []);
         };
         gameState.browseManager.requestRoomList();
     } catch (error) {
-        console.error('Failed to connect for room browsing:', error);
+        console.error('Room browsing connection failed:', error.message);
         renderRoomList([]);
+
+        // Update status to error
+        if (statusEl) {
+            statusEl.querySelector('.status-icon').textContent = '✗';
+            statusEl.querySelector('.status-text').textContent = 'Connection failed';
+        }
     }
 }
 
@@ -627,17 +752,21 @@ function stopRoomBrowsing() {
     }
     const browserEl = document.getElementById('roomBrowser');
     if (browserEl) browserEl.style.display = 'none';
+
+    // Hide connection status
+    const statusEl = document.getElementById('connectionStatus');
+    if (statusEl) statusEl.style.display = 'none';
 }
 
 function renderRoomList(rooms) {
     const listEl = document.getElementById('roomList');
     if (!listEl) return;
-    
+
     if (!rooms || rooms.length === 0) {
         listEl.innerHTML = '<p class="room-list-empty">No lobbies available</p>';
         return;
     }
-    
+
     listEl.innerHTML = '';
     rooms.forEach(room => {
         const item = document.createElement('div');
@@ -804,7 +933,7 @@ function updateAvatar(imgId, placeholderId, avatarUrl) {
 function updatePlayersList(players) {
     const listEl = document.getElementById('playersList');
     listEl.innerHTML = '<h3>Players:</h3>';
-    
+
     players.forEach(player => {
         const playerDiv = document.createElement('div');
         playerDiv.className = 'player-item';
@@ -819,7 +948,6 @@ async function startGame(zoneName) {
     }
 
     const playerId = gameState.networkManager ? gameState.networkManager.playerId : 'player1';
-    console.log('Starting game:', { zoneName, playerId, isHost: gameState.currentHostId === playerId, character: gameState.selectedCharacter });
 
     // In multiplayer, request zone enter from server to get enemy state
     // Init with empty enemies - they'll be synced via onZoneEnter

@@ -41,6 +41,7 @@ class Game {
         this.hitStop = { timer: 0 };
         this.damageNumbers = [];
         this.deathParticles = [];
+        this.weaponTrails = [];
 
         this.activeMinigame = null; // TankGame or CardGame controller
         this.enemies = [];
@@ -182,6 +183,13 @@ class Game {
             const proj = this.localPlayer.fireProjectile(angle);
             if (proj) {
                 this.projectiles.push(proj);
+
+                // Create weapon trail from barrel to projectile spawn point
+                const barrelLength = CONFIG.GUN_BARREL_LENGTH || 20;
+                const barrelX = this.localPlayer.x + Math.cos(angle) * barrelLength;
+                const barrelY = this.localPlayer.y + Math.sin(angle) * barrelLength;
+                this.createWeaponTrail(barrelX, barrelY, proj.x, proj.y);
+
                 // Notify network to sync projectile to other players
                 if (this.onPlayerFire) {
                     this.onPlayerFire(proj.x, proj.y, proj.angle);
@@ -474,6 +482,7 @@ class Game {
         // Update juice effects
         this.updateDamageNumbers(frameDt);
         this.updateDeathParticles(frameDt);
+        this.updateWeaponTrails(frameDt);
 
         // Enemy AI is now updated in the fixed timestep loop above
 
@@ -634,10 +643,28 @@ class Game {
                         // Create hit spark effect
                         this.createHitSpark(proj.x, proj.y);
 
-                        // Game feel: damage number, shake, hit stop, knockback
+                        // Play impact and hurt sounds with spatial audio
+                        if (window.gameState?.audioManager) {
+                            const panAmount = this.calculatePan(proj.x);
+                            gameState.audioManager.playSound('impact', {
+                                volume: CONFIG.AUDIO_IMPACT_VOLUME,
+                                pan: panAmount,
+                                pitchVariation: CONFIG.AUDIO_PITCH_VARIATION
+                            });
+
+                            // Layer enemy hurt sound with slight delay for depth
+                            setTimeout(() => {
+                                gameState.audioManager.playSound('enemy_hurt', {
+                                    volume: CONFIG.AUDIO_ENEMY_HURT_VOLUME,
+                                    pan: panAmount,
+                                    pitchVariation: CONFIG.AUDIO_PITCH_VARIATION * 1.5
+                                });
+                            }, 25);
+                        }
+
+                        // Game feel: damage number, shake, knockback (hit stop removed - only on kills)
                         this.spawnDamageNumber(proj.x, proj.y - 10, proj.damage);
                         this.triggerScreenShake(CONFIG.SCREEN_SHAKE_DAMAGE_DEALT, 0.08);
-                        this.triggerHitStop(CONFIG.HIT_STOP_DURATION);
                         enemy.applyKnockback(proj.x, proj.y, CONFIG.KNOCKBACK_FORCE);
 
                         // Server-authoritative: always send damage to server
@@ -782,6 +809,18 @@ class Game {
         this.hitStop.timer = Math.max(this.hitStop.timer, duration);
     }
 
+    /**
+     * Calculate stereo pan based on world X position relative to camera
+     * @param {number} worldX - World x coordinate
+     * @returns {number} Pan value (-1 to 1, left to right)
+     */
+    calculatePan(worldX) {
+        const cameraCenter = this.cameraX + this.canvas.width / 2;
+        const offset = worldX - cameraCenter;
+        const panRange = CONFIG.AUDIO_SPATIAL_PAN_RANGE || 600;
+        return Math.max(-1, Math.min(1, offset / panRange));
+    }
+
     spawnDamageNumber(x, y, amount) {
         const lifetime = CONFIG.DAMAGE_NUMBER_LIFETIME || 0.8;
         this.damageNumbers.push({
@@ -868,6 +907,46 @@ class Game {
             this.ctx.fillStyle = `rgba(92, 74, 74, ${progress})`;
             this.ctx.beginPath();
             this.ctx.arc(screenX, screenY, size, 0, Math.PI * 2);
+            this.ctx.fill();
+        }
+    }
+
+    /**
+     * Create weapon trail particles from barrel to projectile spawn point
+     */
+    createWeaponTrail(startX, startY, endX, endY) {
+        const count = CONFIG.WEAPON_TRAIL_PARTICLE_COUNT || 5;
+        for (let i = 0; i < count; i++) {
+            const t = i / count;
+            this.weaponTrails.push({
+                x: startX + (endX - startX) * t,
+                y: startY + (endY - startY) * t,
+                lifetime: CONFIG.WEAPON_TRAIL_LIFETIME || 0.15,
+                maxLifetime: CONFIG.WEAPON_TRAIL_LIFETIME || 0.15,
+                size: 3 - (i * 0.4) // Smaller towards bullet tip
+            });
+        }
+    }
+
+    updateWeaponTrails(dt) {
+        for (let i = this.weaponTrails.length - 1; i >= 0; i--) {
+            this.weaponTrails[i].lifetime -= dt;
+            if (this.weaponTrails[i].lifetime <= 0) {
+                this.weaponTrails.splice(i, 1);
+            }
+        }
+    }
+
+    drawWeaponTrails() {
+        for (const trail of this.weaponTrails) {
+            const progress = trail.lifetime / trail.maxLifetime;
+            const alpha = progress * 0.6;
+            const screenX = trail.x - this.cameraX;
+            const screenY = trail.y - this.cameraY;
+
+            this.ctx.fillStyle = `rgba(255, 220, 100, ${alpha})`;
+            this.ctx.beginPath();
+            this.ctx.arc(screenX, screenY, trail.size * progress, 0, Math.PI * 2);
             this.ctx.fill();
         }
     }
@@ -1127,6 +1206,7 @@ class Game {
         });
 
         // Draw projectiles and effects
+        this.drawWeaponTrails(); // Draw trails before projectiles for proper layering
         this.drawProjectiles();
         this.drawHitSparks();
         this.drawDeathParticles();

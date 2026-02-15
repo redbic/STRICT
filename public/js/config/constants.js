@@ -95,6 +95,28 @@ const CONFIG = {
   DEATH_PARTICLE_LIFETIME: 0.6,      // Particle lifetime (seconds)
 
   // ===================
+  // Audio System
+  // ===================
+  AUDIO_MASTER_VOLUME: 0.8,           // Master volume (0-1)
+  AUDIO_SFX_VOLUME: 1.0,              // SFX volume multiplier on master
+  AUDIO_MUSIC_VOLUME: 0.4,            // Music volume (lower than SFX)
+  AUDIO_GUN_FIRE_VOLUME: 0.7,         // Gun fire sound volume
+  AUDIO_IMPACT_VOLUME: 0.6,           // Projectile impact volume
+  AUDIO_ENEMY_HURT_VOLUME: 0.5,       // Enemy damage grunt volume
+  AUDIO_ENEMY_DEATH_VOLUME: 0.7,      // Enemy death sound volume
+  AUDIO_PITCH_VARIATION: 0.1,         // ±10% pitch randomization
+  AUDIO_SPATIAL_PAN_RANGE: 600,       // Distance for full L/R stereo pan
+  MUSIC_FADE_DURATION: 2.0,           // Music fade in/out time (seconds)
+
+  // ===================
+  // Combat Feel (Enhanced)
+  // ===================
+  HIT_STOP_KILL_DURATION: 0.1,        // Frame freeze on kill (100ms)
+  WEAPON_TRAIL_LIFETIME: 0.15,        // Weapon trail fade time
+  WEAPON_TRAIL_PARTICLE_COUNT: 5,     // Particles per shot trail
+  WEAPON_TRAIL_SPACING: 4,            // Pixels between trail particles
+
+  // ===================
   // Tank Game (Room 1)
   // ===================
   TANK_ENEMY_SPEED: 60,              // Tank enemy patrol speed (px/s)
@@ -128,3 +150,6 @@ const CONFIG = {
 if (typeof window !== 'undefined') {
   window.CONFIG = CONFIG;
 }
+
+// ES module export for module scripts
+export { CONFIG };
