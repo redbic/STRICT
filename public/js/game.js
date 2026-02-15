@@ -5,11 +5,6 @@ class Game {
         this.ctx = this.canvas.getContext('2d');
         this.gameContainer = document.getElementById('game');
 
-        // PixiJS renderer (WebGL)
-        // Temporarily disabled while debugging - set to true to enable
-        this.usePixi = false;
-        this.pixiReady = false;
-
         this.resizeCanvas();
 
         // Pre-render vignette effect for noir atmosphere (Canvas fallback)
@@ -206,24 +201,6 @@ class Game {
         window.addEventListener('resize', this.handleResize);
         // Prevent context menu on game container to avoid accidental triggers during intense gameplay
         this.gameContainer.addEventListener('contextmenu', this.handleContextMenu);
-
-        // Initialize PixiJS renderer
-        if (this.usePixi && typeof PixiRenderer !== 'undefined') {
-            this.initPixi();
-        }
-    }
-
-    async initPixi() {
-        try {
-            pixiRenderer = new PixiRenderer();
-            await pixiRenderer.init(this.canvas);
-            this.pixiReady = true;
-            console.log('PixiJS renderer ready');
-        } catch (err) {
-            console.error('PixiJS init failed, falling back to Canvas 2D:', err);
-            this.usePixi = false;
-            this.pixiReady = false;
-        }
     }
 
     resizeCanvas() {
@@ -231,11 +208,6 @@ class Game {
         this.canvas.height = window.innerHeight;
         // Recreate vignette when canvas size changes
         this.createVignetteCanvas();
-
-        // Resize PixiJS renderer
-        if (this.pixiReady && pixiRenderer) {
-            pixiRenderer.resize();
-        }
     }
 
     createVignetteCanvas() {
@@ -331,17 +303,6 @@ class Game {
         this.cameraY = this.localPlayer.y - this.canvas.height / 2;
         this.cameraTargetX = this.cameraX;
         this.cameraTargetY = this.cameraY;
-
-        // Build PixiJS zone graphics (with error handling to ensure game starts)
-        if (this.pixiReady && pixiRenderer) {
-            try {
-                pixiRenderer.buildZone(this.zone);
-            } catch (err) {
-                console.error('PixiJS buildZone failed, falling back to Canvas 2D:', err);
-                this.usePixi = false;
-                this.pixiReady = false;
-            }
-        }
 
         this.gameStarted = true;
 
@@ -654,10 +615,6 @@ class Game {
             }
 
             if (!proj.alive) {
-                // Clean up PixiJS sprite
-                if (proj.pixiSprite && pixiRenderer) {
-                    pixiRenderer.removeProjectileSprite(proj.pixiSprite);
-                }
                 this.projectiles.splice(i, 1);
             }
         }
@@ -672,16 +629,6 @@ class Game {
     }
 
     createHitSpark(x, y) {
-        // Use PixiJS sparks if available
-        if (this.pixiReady && pixiRenderer) {
-            const sparkCount = 6;
-            for (let i = 0; i < sparkCount; i++) {
-                pixiRenderer.createSpark(x, y);
-            }
-            return;
-        }
-
-        // Canvas fallback
         const sparkCount = 6;
         for (let i = 0; i < sparkCount; i++) {
             const angle = (Math.PI * 2 * i) / sparkCount + Math.random() * 0.5;
@@ -985,90 +932,7 @@ class Game {
     
     
     draw() {
-        // Use PixiJS rendering if available
-        if (this.pixiReady && pixiRenderer) {
-            this.drawPixi();
-            return;
-        }
-
-        // Canvas 2D fallback rendering
         this.drawCanvas();
-    }
-
-    // PixiJS WebGL rendering
-    drawPixi() {
-        // Safety check - fall back to Canvas if PixiJS isn't ready
-        if (!this.pixiReady || !pixiRenderer) {
-            this.drawCanvas();
-            return;
-        }
-
-        const frameDt = this.deltaTime || 1/60;
-
-        try {
-            // Update camera
-            if (this.localPlayer) {
-                pixiRenderer.updateCamera(this.localPlayer.x, this.localPlayer.y);
-            }
-
-        // Update player sprites
-        this.players.forEach(player => {
-            pixiRenderer.updatePlayerSprite(player);
-        });
-
-        // Remove sprites for players no longer in the game
-        const playerIds = new Set(this.players.map(p => p.id));
-        pixiRenderer.playerSprites.forEach((sprite, id) => {
-            if (!playerIds.has(id)) {
-                pixiRenderer.removePlayerSprite(id);
-            }
-        });
-
-        // Update enemy sprites
-        this.enemies.forEach(enemy => {
-            pixiRenderer.updateEnemySprite(enemy);
-        });
-
-        // Remove sprites for dead enemies
-        const enemyIds = new Set(this.enemies.map(e => e.id));
-        pixiRenderer.enemySprites.forEach((sprite, id) => {
-            if (!enemyIds.has(id)) {
-                pixiRenderer.removeEnemySprite(id);
-            }
-        });
-
-        // Update NPC sprites
-        this.npcs.forEach(npc => {
-            pixiRenderer.updateNpcSprite(npc);
-        });
-
-        // Update projectiles
-        // Create sprites for new projectiles
-        this.projectiles.forEach(proj => {
-            if (!proj.pixiSprite) {
-                proj.pixiSprite = pixiRenderer.createProjectileSprite(proj);
-            } else {
-                pixiRenderer.updateProjectileSprite(proj, proj.pixiSprite);
-            }
-        });
-
-        // Update sparks
-        pixiRenderer.updateSparks(frameDt);
-
-        // Update clock hands
-        pixiRenderer.updateClockHands();
-
-        // Update screen flash
-        if (this.screenFlash.active) {
-            pixiRenderer.triggerScreenFlash(0.3);
-        }
-        pixiRenderer.updateScreenFlash(frameDt);
-        } catch (err) {
-            console.error('PixiJS render error, falling back to Canvas 2D:', err);
-            this.usePixi = false;
-            this.pixiReady = false;
-            this.drawCanvas();
-        }
     }
 
     drawEntitiesCulled(entities) {
@@ -1285,13 +1149,6 @@ class Game {
             this.activeMinigame.destroy();
             this.activeMinigame = null;
         }
-
-        // Destroy PixiJS renderer
-        if (pixiRenderer) {
-            pixiRenderer.destroy();
-            pixiRenderer = null;
-        }
-        this.pixiReady = false;
 
         // Remove all event listeners
         window.removeEventListener('keydown', this.handleKeyDown);

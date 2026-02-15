@@ -155,12 +155,7 @@ class Enemy {
 
         ctx.save();
 
-        // Check if sprite is available
-        if (typeof spriteManager !== 'undefined' && spriteManager.has('enemy')) {
-            const sprite = spriteManager.get('enemy');
-            const size = this.width * 1.5;
-            ctx.drawImage(sprite, screenX - size/2, screenY - size/2, size, size);
-        } else if (typeof EntityRenderer !== 'undefined') {
+        if (typeof EntityRenderer !== 'undefined') {
             // Use shared renderer utilities
             const bodyColor = this.stunned ? '#8a8580' : EntityRenderer.getColor('ENEMY_BODY', '#5c4a4a');
             const eyeColor = EntityRenderer.getColor('ENEMY_EYES', '#2a2a2a');

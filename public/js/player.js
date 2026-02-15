@@ -217,13 +217,9 @@ class Player {
         const screenX = this.x - cameraX;
         const screenY = this.y - cameraY;
 
-        // Try to use LimeZu character sprites first
+        // Use LimeZu character sprites or canvas fallback
         if (typeof characterSprites !== 'undefined' && characterSprites && characterSprites.loaded) {
             this.drawWithTilesetSprite(ctx, screenX, screenY);
-        }
-        // Fall back to custom sprite if available
-        else if (typeof spriteManager !== 'undefined' && spriteManager.has('player')) {
-            this.drawWithSprite(ctx, screenX, screenY);
         } else {
             this.drawFallback(ctx, screenX, screenY);
         }
@@ -382,28 +378,6 @@ class Player {
         // this.drawGun(ctx, screenX, screenY);
 
         // Draw UI elements
-        this.drawUI(ctx, screenX, screenY);
-    }
-
-    /**
-     * Draw player using sprite image
-     */
-    drawWithSprite(ctx, screenX, screenY) {
-        const now = performance.now() / 1000;
-        const moveIntensity = Math.min(1, this.speed / this.maxSpeed);
-
-        ctx.save();
-        ctx.translate(screenX, screenY);
-        ctx.rotate(this.angle);
-
-        const sprite = spriteManager.get('player');
-        const size = PLAYER_SIZE;
-        ctx.drawImage(sprite, -size/2, -size/2, size, size);
-
-        ctx.restore();
-
-        // Draw gun and effects on top
-        this.drawGun(ctx, screenX, screenY);
         this.drawUI(ctx, screenX, screenY);
     }
 

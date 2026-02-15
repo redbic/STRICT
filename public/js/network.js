@@ -86,6 +86,13 @@ class NetworkManager {
             case 'player_state':
                 if (this.onPlayerState) this.onPlayerState(data);
                 break;
+            case 'player_states_batch':
+                if (this.onPlayerState && data.updates) {
+                    for (const update of data.updates) {
+                        this.onPlayerState(update);
+                    }
+                }
+                break;
             case 'game_start':
                 if (this.onGameStart) this.onGameStart(data);
                 break;

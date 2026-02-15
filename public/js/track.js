@@ -72,19 +72,13 @@ class Zone {
         const floorCol = typeof COLORS !== 'undefined' ? COLORS.FLOOR_COLOR : this.floorColor;
         const wallCol = typeof COLORS !== 'undefined' ? COLORS.WALL_COLOR : this.wallColor;
 
-        // Try to use LimeZu tileset for floor
+        // Draw floor using LimeZu tileset or color fallback
         if (typeof tilesetManager !== 'undefined' && tilesetManager && tilesetManager.loaded) {
             this.drawTilesetFloor(ctx, cameraX, cameraY);
-        }
-        // Fall back to custom sprite if available
-        else if (typeof spriteManager !== 'undefined' && spriteManager.has('floorTile')) {
-            this.drawTiledFloor(ctx, cameraX, cameraY);
         } else {
-            // Fallback - liminal carpet with subtle pattern
             ctx.fillStyle = floorCol;
             ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
-            // Subtle carpet/tile grid pattern
             ctx.strokeStyle = 'rgba(154, 139, 112, 0.25)';
             ctx.lineWidth = 1;
             const tileSize = 64;
@@ -206,22 +200,6 @@ class Zone {
             ctx.textAlign = 'center';
             ctx.fillText(item.icon || '📦', itemX, itemY + 6);
         });
-    }
-
-    /**
-     * Draw tiled floor using sprites
-     */
-    drawTiledFloor(ctx, cameraX, cameraY) {
-        const tile = spriteManager.get('floorTile');
-        const tileSize = 64;
-        const startX = Math.floor(cameraX / tileSize) * tileSize - cameraX;
-        const startY = Math.floor(cameraY / tileSize) * tileSize - cameraY;
-
-        for (let x = startX; x < ctx.canvas.width + tileSize; x += tileSize) {
-            for (let y = startY; y < ctx.canvas.height + tileSize; y += tileSize) {
-                ctx.drawImage(tile, x, y, tileSize, tileSize);
-            }
-        }
     }
 
     /**
