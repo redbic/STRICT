@@ -113,8 +113,7 @@ app.use(sessionMiddleware);
 app.use(createAuthRouter());
 app.use(authMiddleware);
 
-// Static files (after auth)
-app.use(express.static(path.join(__dirname, 'public')));
+// Security headers (must be before static files so they apply to all responses)
 app.use((_req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'no-referrer');
@@ -122,6 +121,9 @@ app.use((_req, res, next) => {
   res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
   next();
 });
+
+// Static files (after auth and security headers)
+app.use(express.static(path.join(__dirname, 'public')));
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -264,8 +266,12 @@ async function loadZoneData(zoneId) {
   }
 }
 
-// Save zone data
+// Save zone data (restricted to development mode only — zone editor is a dev tool)
 app.post('/api/zones/:zoneId', async (req, res) => {
+  if (isProduction) {
+    return res.status(403).json({ error: 'Zone editing is disabled in production' });
+  }
+
   const zoneId = normalizeSafeString(req.params.zoneId);
   if (!zoneId || !/^[a-z0-9_-]+$/i.test(zoneId)) {
     return res.status(400).json({ error: 'Invalid zone ID' });
@@ -555,23 +561,29 @@ function handleJoinRoom(ws, data) {
   broadcastRoomList();
 }
 
+/**
+ * Remove a player from their zone session (shared by handleLeaveRoom and handleDisconnect)
+ */
+function removePlayerFromZoneSession(roomId, playerId) {
+  const room = rooms.getRoom(roomId);
+  if (!room) return;
+  const player = room.players.find(p => p.id === playerId);
+  if (player && player.zone && room.zoneSessions) {
+    const session = room.zoneSessions.get(player.zone);
+    if (session) {
+      const isEmpty = session.removePlayer(playerId);
+      if (isEmpty) {
+        room.zoneSessions.delete(player.zone);
+      }
+    }
+  }
+}
+
 function handleLeaveRoom(ws) {
   if (!ws.roomId) return;
 
   // Remove player from zone session before removing from room
-  const room = rooms.getRoom(ws.roomId);
-  if (room) {
-    const player = room.players.find(p => p.id === ws.playerId);
-    if (player && player.zone && room.zoneSessions) {
-      const session = room.zoneSessions.get(player.zone);
-      if (session) {
-        const isEmpty = session.removePlayer(ws.playerId);
-        if (isEmpty) {
-          room.zoneSessions.delete(player.zone);
-        }
-      }
-    }
-  }
+  removePlayerFromZoneSession(ws.roomId, ws.playerId);
 
   const result = rooms.removePlayer(ws.roomId, ws.playerId);
   if (result) {
@@ -844,19 +856,7 @@ function handleDisconnect(ws) {
   const roomId = ws.roomId;
 
   // Remove player from zone session before removing from room
-  const room = rooms.getRoom(roomId);
-  if (room) {
-    const player = room.players.find(p => p.id === ws.playerId);
-    if (player && player.zone && room.zoneSessions) {
-      const session = room.zoneSessions.get(player.zone);
-      if (session) {
-        const isEmpty = session.removePlayer(ws.playerId);
-        if (isEmpty) {
-          room.zoneSessions.delete(player.zone);
-        }
-      }
-    }
-  }
+  removePlayerFromZoneSession(roomId, ws.playerId);
 
   const result = rooms.removePlayerByWs(roomId, ws);
 
@@ -956,11 +956,23 @@ function shutdown(signal) {
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 
-// Periodic cleanup of stale IP connection counts
+// Periodic cleanup of stale IP connection counts — reconcile with actual connections
 setInterval(() => {
-  for (const [ip, count] of wsConnectionsByIp) {
-    if (count <= 0) {
+  // Count actual open connections per IP
+  const actualCounts = new Map();
+  wss.clients.forEach(client => {
+    if (client.readyState === WebSocket.OPEN && client.clientIp) {
+      actualCounts.set(client.clientIp, (actualCounts.get(client.clientIp) || 0) + 1);
+    }
+  });
+
+  // Reconcile: remove stale entries, correct drifted counts
+  for (const [ip] of wsConnectionsByIp) {
+    const actual = actualCounts.get(ip) || 0;
+    if (actual === 0) {
       wsConnectionsByIp.delete(ip);
+    } else {
+      wsConnectionsByIp.set(ip, actual);
     }
   }
 }, WS_IP_CLEANUP_INTERVAL_MS);

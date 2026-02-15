@@ -36,14 +36,15 @@ const CRATE_POSITIONS = [
   { x: 456, y: 288 }, { x: 456, y: 576 },
 ];
 
-let nextProjectileId = 0;
-let nextPickupId = 0;
-
 class TankZoneSession {
   constructor(roomId, zoneId, zoneData, deps) {
     this.roomId = roomId;
     this.zoneId = zoneId;
     this.deps = deps;
+
+    // Per-session ID counters (avoids unbounded global growth)
+    this._nextProjectileId = 0;
+    this._nextPickupId = 0;
 
     // Build collision with pillars (crates added dynamically)
     this.collision = new ServerCollision(zoneData);
@@ -417,8 +418,6 @@ class TankZoneSession {
   // --- Tank AI ---
 
   _updateTanks(dt) {
-    const nearest = this._getNearestAlivePlayer();
-
     for (const tank of this.tanks) {
       if (!tank.alive) continue;
 
@@ -449,6 +448,8 @@ class TankZoneSession {
         continue;
       }
 
+      // Find nearest player relative to THIS tank's position
+      const nearest = this._getNearestAlivePlayer(tank.x, tank.y);
       if (!nearest) continue;
 
       // Turret always aims at nearest player
@@ -516,7 +517,7 @@ class TankZoneSession {
 
   _createProjectile(tank, angle) {
     const barrelLen = tank.type === 'boss' ? 30 : 20;
-    const id = `tp-${nextProjectileId++}`;
+    const id = `tp-${this._nextProjectileId++}`;
     this.projectiles.push({
       id,
       x: tank.x + Math.cos(angle) * barrelLen,
@@ -643,7 +644,7 @@ class TankZoneSession {
 
     let pickup = null;
     if (Math.random() < TANK.HEALTH_DROP_CHANCE) {
-      const pid = `hp-${nextPickupId++}`;
+      const pid = `hp-${this._nextPickupId++}`;
       const hp = { id: pid, x: crate.x, y: crate.y };
       this.healthPickups.push(hp);
       pickup = hp;
@@ -700,14 +701,13 @@ class TankZoneSession {
 
   // --- Helpers ---
 
-  _getNearestAlivePlayer() {
+  _getNearestAlivePlayer(fromX, fromY) {
     let nearest = null;
     let minDist = Infinity;
     for (const [, player] of this.players) {
       if (player.isDead || player.hp <= 0) continue;
-      // Use distance from arena center as tiebreaker (any alive player works)
-      const dist = Math.hypot(player.x - 480, player.y - 480);
-      if (!nearest || dist < minDist) {
+      const dist = Math.hypot(player.x - fromX, player.y - fromY);
+      if (dist < minDist) {
         minDist = dist;
         nearest = player;
       }

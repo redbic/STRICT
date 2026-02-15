@@ -10,11 +10,11 @@ class Projectile {
         this.x = x;
         this.y = y;
         this.angle = angle;
-        this.speed = options.speed || PROJECTILE_SPEED;
+        this.speed = options.speed !== undefined ? options.speed : PROJECTILE_SPEED;
         this.vx = Math.cos(angle) * this.speed;
         this.vy = Math.sin(angle) * this.speed;
-        this.radius = options.radius || PROJECTILE_RADIUS;
-        this.damage = options.damage || PROJECTILE_DAMAGE;
+        this.radius = options.radius !== undefined ? options.radius : PROJECTILE_RADIUS;
+        this.damage = options.damage !== undefined ? options.damage : PROJECTILE_DAMAGE;
         this.ownerId = ownerId;
         this.maxBounces = options.maxBounces || 0;  // Default weapon: 0
         this.bounces = 0;
@@ -32,6 +32,8 @@ class Projectile {
         const nextX = this.x + this.vx * dt;
         const nextY = this.y + this.vy * dt;
 
+        let bounced = false;
+
         // Check zone bounds
         if (zone) {
             if (nextX < this.radius || nextX > zone.width - this.radius ||
@@ -39,6 +41,7 @@ class Projectile {
                 if (this.bounces < this.maxBounces) {
                     this.bounceOffBounds(zone, nextX, nextY);
                     this.bounces++;
+                    bounced = true;
                 } else {
                     this.alive = false;
                     return;
@@ -46,16 +49,19 @@ class Projectile {
             }
         }
 
-        // Wall collision check using zone
-        if (zone && this.checkWallCollision(zone, nextX, nextY)) {
+        // Wall collision check (skip if already bounced off boundary this frame)
+        if (!bounced && zone && this.checkWallCollision(zone, nextX, nextY)) {
             if (this.bounces < this.maxBounces) {
                 this.bounce(zone, nextX, nextY);
                 this.bounces++;
+                bounced = true;
             } else {
                 this.alive = false;
                 return;
             }
-        } else {
+        }
+
+        if (!bounced) {
             this.x = nextX;
             this.y = nextY;
         }

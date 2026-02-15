@@ -28,7 +28,7 @@ const COLORS = {
     FLUORESCENT_HARSH: '#f5f0c0',
 
     // Accent colors (muted, institutional)
-    Exit_GREEN: '#4a7c4e',
+    EXIT_GREEN: '#4a7c4e',
     EXIT_RED: '#b04040',
     FADED_TEAL: '#5a8080',
     DUSTY_ROSE: '#c0a0a0',

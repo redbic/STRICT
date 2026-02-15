@@ -2,13 +2,25 @@
 // Session-based authentication with login page
 
 const { Router } = require('express');
+const crypto = require('crypto');
 const { normalizeSafeString } = require('./validation');
 
 const LOGIN_RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const LOGIN_RATE_LIMIT_MAX = 10;
 const loginRateLimiter = new Map(); // ip -> { count, resetAt }
 
-const PASSWORD = normalizeSafeString(process.env.APP_PASSWORD || '').toLowerCase();
+// Periodic cleanup of stale rate limiter entries (every 5 minutes)
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of loginRateLimiter) {
+    if (now >= entry.resetAt) {
+      loginRateLimiter.delete(ip);
+    }
+  }
+}, 5 * 60 * 1000);
+
+// Store password without case folding (case-sensitive comparison)
+const PASSWORD = normalizeSafeString(process.env.APP_PASSWORD || '');
 
 function createAuthRouter() {
   const router = Router();
@@ -29,9 +41,14 @@ function createAuthRouter() {
     }
 
     const { password } = req.body;
-    const providedPassword = normalizeSafeString(password || '').toLowerCase();
+    const providedPassword = normalizeSafeString(password || '');
 
-    if (providedPassword && providedPassword === PASSWORD) {
+    // Timing-safe comparison to prevent timing attacks
+    const passwordsMatch = providedPassword.length > 0 &&
+      providedPassword.length === PASSWORD.length &&
+      crypto.timingSafeEqual(Buffer.from(providedPassword), Buffer.from(PASSWORD));
+
+    if (passwordsMatch) {
       req.session.authenticated = true;
       loginRateLimiter.delete(ip);
       // Explicitly save session before responding to ensure cookie is set

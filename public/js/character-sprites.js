@@ -62,18 +62,22 @@ class CharacterSpriteManager {
         const moving = speed > 10; // Threshold for movement
 
         if (!moving) {
-            // Idle - use last direction
-            return 'idle_down'; // Default, could track last direction
+            // Idle - use last tracked direction
+            return 'idle_' + (this._lastDirection || 'down');
         }
 
         // Determine direction based on velocity
         const angle = Math.atan2(vy, vx);
         const deg = (angle * 180 / Math.PI + 360) % 360;
 
-        if (deg >= 315 || deg < 45) return 'walk_right';
-        if (deg >= 45 && deg < 135) return 'walk_down';
-        if (deg >= 135 && deg < 225) return 'walk_left';
-        return 'walk_up';
+        let direction;
+        if (deg >= 315 || deg < 45) direction = 'right';
+        else if (deg >= 45 && deg < 135) direction = 'down';
+        else if (deg >= 135 && deg < 225) direction = 'left';
+        else direction = 'up';
+
+        this._lastDirection = direction;
+        return 'walk_' + direction;
     }
 
     // Draw a character

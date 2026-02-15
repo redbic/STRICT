@@ -47,11 +47,12 @@ class CardGame {
         this.mouseX = 0;
         this.mouseY = 0;
 
-        // Click handler
+        // Click handler (scoped to canvas to avoid interfering with other UI)
         this._clickHandler = (e) => this.handleClick(e);
         this._moveHandler = (e) => this.handleMouseMove(e);
-        window.addEventListener('click', this._clickHandler);
-        window.addEventListener('mousemove', this._moveHandler);
+        this._eventTarget = this.game.canvas || window;
+        this._eventTarget.addEventListener('click', this._clickHandler);
+        this._eventTarget.addEventListener('mousemove', this._moveHandler);
 
         // Animation
         this.animations = [];
@@ -248,7 +249,11 @@ class CardGame {
 
             lanes.forEach(lane => {
                 const defender = this.dealerBoard[lane];
-                if (defender) {
+                // Airborne: flies over blockers unless they have mighty_leap
+                if (defender && attacker.sigil === 'airborne' && defender.sigil !== 'mighty_leap') {
+                    // Airborne bypasses this blocker — direct damage to dealer
+                    this.dealerHP -= attacker.attack;
+                } else if (defender) {
                     if (attacker.sigil === 'deathtouch') {
                         defender.currentHealth = 0;
                     } else {
@@ -257,8 +262,8 @@ class CardGame {
                     if (defender.currentHealth <= 0) {
                         this.dealerBoard[lane] = null;
                     }
-                } else if (attacker.sigil === 'airborne' || !defender) {
-                    // Direct damage to dealer
+                } else {
+                    // No defender — direct damage to dealer
                     this.dealerHP -= attacker.attack;
                 }
             });
@@ -376,9 +381,11 @@ class CardGame {
         const H = canvas.height;
 
         if (this.state === 'intro') {
+            // Transition directly to playerTurn without drawing extra cards
+            // (initial hand was already drawn in constructor)
             this.state = 'playerTurn';
+            this.turn = 1;
             this.stateTimer = 0;
-            this.startPlayerTurn();
             return;
         }
 
@@ -522,7 +529,10 @@ class CardGame {
         this.drawCards(this.HAND_SIZE);
         this.queueDealerText("Shall we... try again?");
         this.speakDealer("Shall we try again?");
-        this.startPlayerTurn();
+        // Go directly to playerTurn without drawing extra cards
+        // (HAND_SIZE cards already drawn above)
+        this.state = 'playerTurn';
+        this.turn = 1;
     }
 
     // ==================
@@ -530,6 +540,16 @@ class CardGame {
     // ==================
 
     queueDealerText(text) {
+        // Sets (replaces) the current dealer text with typewriter effect
+        this.dealerTextQueue.push(text);
+        if (this.dealerTextTimer <= 0) {
+            this._advanceDealerText();
+        }
+    }
+
+    _advanceDealerText() {
+        if (this.dealerTextQueue.length === 0) return;
+        const text = this.dealerTextQueue.shift();
         this.typewriterTarget = text;
         this.typewriterIndex = 0;
         this.typewriterTimer = 0;
@@ -577,13 +597,19 @@ class CardGame {
 
         if (this.dealerTextTimer > 0) {
             this.dealerTextTimer -= dt;
+            if (this.dealerTextTimer <= 0) {
+                // Advance to next queued text if available
+                this._advanceDealerText();
+            }
         }
 
         // State machine
         if (this.state === 'intro') {
             this.stateTimer -= dt;
             if (this.stateTimer <= 0) {
-                this.startPlayerTurn();
+                // Transition without drawing extra cards (initial hand already drawn)
+                this.state = 'playerTurn';
+                this.turn = 1;
             }
         }
 
@@ -1193,8 +1219,8 @@ class CardGame {
         // Restore game UI
         this.showGameUI();
 
-        window.removeEventListener('click', this._clickHandler);
-        window.removeEventListener('mousemove', this._moveHandler);
+        this._eventTarget.removeEventListener('click', this._clickHandler);
+        this._eventTarget.removeEventListener('mousemove', this._moveHandler);
         // Stop any ongoing TTS
         if (typeof window !== 'undefined' && window.speechSynthesis) {
             window.speechSynthesis.cancel();

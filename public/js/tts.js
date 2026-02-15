@@ -91,8 +91,10 @@
         if (isMuted) return;
         if (!('speechSynthesis' in window)) return;
 
-        // Cancel any current speech
-        speechSynthesis.cancel();
+        // Only cancel if speech queue is getting long (avoid interrupting every time)
+        if (speechSynthesis.pending || speechSynthesis.speaking) {
+            speechSynthesis.cancel();
+        }
 
         const utterance = new SpeechSynthesisUtterance(text);
 

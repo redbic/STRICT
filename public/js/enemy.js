@@ -71,8 +71,9 @@ class Enemy {
                 this.x = oldX;
                 this.y = oldY;
             }
-            this.knockbackVX *= kbDecay;
-            this.knockbackVY *= kbDecay;
+            const decayFactor = Math.pow(kbDecay, dt * 60);
+            this.knockbackVX *= decayFactor;
+            this.knockbackVY *= decayFactor;
         } else {
             this.knockbackVX = 0;
             this.knockbackVY = 0;

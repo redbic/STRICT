@@ -128,7 +128,9 @@ class InputManager {
    * @returns {boolean}
    */
   isKeyDown(key) {
-    return !!this.keys[key.toLowerCase()];
+    // Check both exact key and lowercase form since _normalizeKey stores
+    // arrow keys as 'ArrowUp' etc. but single chars as lowercase
+    return !!this.keys[key] || !!this.keys[key.toLowerCase()];
   }
 
   /**

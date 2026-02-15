@@ -33,6 +33,8 @@ class TankGame {
         ];
 
         if (this.game.zone) {
+            // Remove any existing pillar/crate walls first to prevent duplicates on re-entry
+            this.game.zone.walls = this.game.zone.walls.filter(w => !w.isPillar && !w.isCrate);
             pillars.forEach(p => {
                 this.game.zone.walls.push({ ...p, isPillar: true });
             });
