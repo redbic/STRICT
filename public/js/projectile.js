@@ -1,9 +1,10 @@
 // Projectile class for tank-style combat
+// Uses centralized CONFIG from config/constants.js
 
-const PROJECTILE_SPEED = 400;      // pixels/sec
-const PROJECTILE_DAMAGE = 20;
-const PROJECTILE_RADIUS = 5;
-const PROJECTILE_MAX_LIFETIME = 3; // seconds
+const PROJECTILE_SPEED = typeof CONFIG !== 'undefined' ? CONFIG.PROJECTILE_SPEED : 850;
+const PROJECTILE_DAMAGE = typeof CONFIG !== 'undefined' ? CONFIG.GUN_DAMAGE : 25;
+const PROJECTILE_RADIUS = typeof CONFIG !== 'undefined' ? CONFIG.PROJECTILE_SIZE : 6;
+const PROJECTILE_MAX_LIFETIME = typeof CONFIG !== 'undefined' ? CONFIG.PROJECTILE_LIFETIME : 2.0;
 
 class Projectile {
     constructor(x, y, angle, ownerId, options = {}) {

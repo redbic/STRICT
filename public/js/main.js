@@ -450,6 +450,10 @@ function setupNetworkHandlers() {
 
         const enemy = gameState.game.enemies.find(e => e.id === data.enemyId);
         if (enemy) {
+            // Trigger damage flash when HP decreases (visible to all clients)
+            if (data.hp < enemy.hp) {
+                enemy.damageFlashTimer = CONFIG.ENEMY_DAMAGE_FLASH_DURATION || 0.12;
+            }
             enemy.hp = data.hp;
             if (data.maxHp !== undefined) {
                 enemy.maxHp = data.maxHp;
@@ -478,6 +482,13 @@ function setupNetworkHandlers() {
         if (enemy) {
             gameState.game.spawnDeathParticles(enemy.x, enemy.y);
             gameState.game.triggerScreenShake(CONFIG.SCREEN_SHAKE_ENEMY_KILL, 0.1);
+            gameState.game.triggerHitStop(CONFIG.HIT_STOP_KILL_DURATION);
+            // Play death sound
+            if (gameState.audioManager) {
+                gameState.audioManager.playSound('enemy_death', {
+                    volume: CONFIG.AUDIO_ENEMY_DEATH_VOLUME || 0.35
+                });
+            }
         }
 
         gameState.game.enemies = gameState.game.enemies.filter(e => e.id !== data.enemyId);

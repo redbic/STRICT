@@ -79,6 +79,9 @@ class Player {
         this.isDead = false;
         this.damageFlashTimer = 0;
 
+        // Footstep sound timer
+        this.footstepTimer = 0;
+
         // Speech bubble for chat
         this.speech = {
             text: '',
@@ -158,6 +161,26 @@ class Player {
             ? CONFIG.SPEED_NORMALIZATION_FACTOR
             : 60;
         this.speed = Math.hypot(this.velocityX, this.velocityY) / normFactor;
+
+        // Footstep sounds (only for local player when moving)
+        const currentSpeed = Math.hypot(this.velocityX, this.velocityY);
+        if (currentSpeed > 40) {
+            this.footstepTimer -= dt;
+            if (this.footstepTimer <= 0) {
+                const interval = typeof CONFIG !== 'undefined' ? CONFIG.FOOTSTEP_INTERVAL : 0.3;
+                this.footstepTimer = interval;
+                if (window.gameState?.audioManager) {
+                    const idx = Math.floor(Math.random() * 4);
+                    const vol = typeof CONFIG !== 'undefined' ? CONFIG.FOOTSTEP_VOLUME : 0.12;
+                    gameState.audioManager.playSound(`footstep_${idx}`, {
+                        volume: vol,
+                        pitchVariation: 0.1
+                    });
+                }
+            }
+        } else {
+            this.footstepTimer = 0; // Reset so first step plays immediately
+        }
 
         // Store old position
         const oldX = this.x;

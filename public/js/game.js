@@ -38,9 +38,15 @@ class Game {
         this.cameraTargetX = 0;
         this.cameraTargetY = 0;
         this.cameraShake = { offsetX: 0, offsetY: 0, intensity: 0, duration: 0, timer: 0 };
+        this.cameraRecoilX = 0;
+        this.cameraRecoilY = 0;
         this.hitStop = { timer: 0 };
         this.damageNumbers = [];
         this.deathParticles = [];
+
+        // Object-pooled particle system for all visual effects
+        this.particles = typeof ParticleSystem !== 'undefined' ? new ParticleSystem(500) : null;
+        this.dustTimer = 0;
 
         this.activeMinigame = null; // TankGame or CardGame controller
         this.enemies = [];
@@ -180,6 +186,12 @@ class Game {
             const proj = this.localPlayer.fireProjectile(angle);
             if (proj) {
                 this.projectiles.push(proj);
+
+                // Camera recoil opposite to shot direction
+                const recoilDist = CONFIG.CAMERA_RECOIL_DISTANCE || 3;
+                this.cameraRecoilX = -Math.cos(angle) * recoilDist;
+                this.cameraRecoilY = -Math.sin(angle) * recoilDist;
+
                 // Notify network to sync projectile to other players
                 if (this.onPlayerFire) {
                     this.onPlayerFire(proj.x, proj.y, proj.angle);
@@ -282,6 +294,8 @@ class Game {
         this.hitSparks = []; // Clear hit sparks
         this.damageNumbers = [];
         this.deathParticles = [];
+        if (this.particles) this.particles.clear();
+        this.dustTimer = 0;
         this.npcs = (zoneData.npcs || []).map(n => new NPC(n.x, n.y, n.name, n.color));
         this.lastPortalId = null;
         this.portalCooldown = 0;
@@ -380,6 +394,7 @@ class Game {
             this.updateDamageNumbers(frameDt);
             this.updateDeathParticles(frameDt);
             this.updateHitSparks(frameDt);
+            if (this.particles) this.particles.update(frameDt);
             return;
         }
 
@@ -451,11 +466,46 @@ class Game {
         // Update hit sparks
         this.updateHitSparks(frameDt);
 
+        // Update particle system (pooled particles: dust, trails, death, sparks)
+        if (this.particles) {
+            this.particles.update(frameDt);
+
+            // Spawn ambient dust motes within camera view
+            this.dustTimer += frameDt;
+            const dustInterval = CONFIG.DUST_SPAWN_INTERVAL || 0.3;
+            if (this.dustTimer >= dustInterval) {
+                this.dustTimer = 0;
+                this.particles.emit({
+                    x: this.cameraX + Math.random() * this.canvas.width,
+                    y: this.cameraY + Math.random() * this.canvas.height,
+                    count: 1,
+                    speed: CONFIG.DUST_PARTICLE_SPEED || [3, 12],
+                    spread: Math.PI * 2,
+                    lifetime: CONFIG.DUST_PARTICLE_LIFETIME || [4.0, 8.0],
+                    size: CONFIG.DUST_PARTICLE_SIZE || [1, 3],
+                    endSize: CONFIG.DUST_PARTICLE_SIZE || [1, 3],
+                    color: '#d4c5a9',
+                    alpha: CONFIG.DUST_PARTICLE_ALPHA || 0.15,
+                    endAlpha: 0,
+                    gravity: -2,
+                    friction: 0.99,
+                    layer: 'below'
+                });
+            }
+        }
+
         // Update juice effects
         this.updateDamageNumbers(frameDt);
         this.updateDeathParticles(frameDt);
 
         // Enemy AI is now updated in the fixed timestep loop above
+        // Update enemy visual effects (flash timers) — AI runs on server
+        for (const enemy of this.enemies) {
+            if (enemy.damageFlashTimer > 0) {
+                enemy.damageFlashTimer -= frameDt;
+                if (enemy.damageFlashTimer < 0) enemy.damageFlashTimer = 0;
+            }
+        }
 
         // Server-authoritative: enemy deaths are handled by server
         // Client receives enemy_killed_sync message and removes enemy
@@ -596,6 +646,22 @@ class Game {
             const proj = this.projectiles[i];
             proj.update(dt, this.zone);
 
+            // Weapon trail particles behind projectile
+            if (proj.alive && this.particles) {
+                this.particles.emit({
+                    x: proj.x, y: proj.y, count: 1,
+                    speed: [5, 15], spread: Math.PI,
+                    lifetime: [(CONFIG.WEAPON_TRAIL_LIFETIME || 0.15) * 0.5, CONFIG.WEAPON_TRAIL_LIFETIME || 0.15],
+                    size: [1, 2.5],
+                    endSize: 0,
+                    color: '#f1c40f',
+                    alpha: 0.4,
+                    endAlpha: 0,
+                    gravity: 0, friction: 0.98,
+                    layer: 'above'
+                });
+            }
+
             // Check enemy collisions (skip remote projectiles — they are visual only)
             if (proj.alive && proj.damage > 0) {
                 // Standard zone enemies
@@ -606,6 +672,19 @@ class Game {
                         this.triggerScreenShake(CONFIG.SCREEN_SHAKE_DAMAGE_DEALT, 0.08);
                         this.triggerHitStop(CONFIG.HIT_STOP_DURATION);
                         enemy.applyKnockback(proj.x, proj.y, CONFIG.KNOCKBACK_FORCE);
+                        // Trigger local visual damage flash on enemy
+                        enemy.damageFlashTimer = CONFIG.ENEMY_DAMAGE_FLASH_DURATION || 0.12;
+                        // Play impact + enemy hurt sounds
+                        if (window.gameState?.audioManager) {
+                            gameState.audioManager.playSound('impact', {
+                                volume: CONFIG.AUDIO_IMPACT_VOLUME,
+                                pitchVariation: CONFIG.AUDIO_PITCH_VARIATION
+                            });
+                            gameState.audioManager.playSound('enemy_hurt', {
+                                volume: CONFIG.AUDIO_ENEMY_HURT_VOLUME,
+                                pitchVariation: CONFIG.AUDIO_PITCH_VARIATION
+                            });
+                        }
                         if (this.onEnemyDamage) {
                             this.onEnemyDamage(enemy.id, proj.damage, proj.x, proj.y);
                         }
@@ -681,7 +760,27 @@ class Game {
             return;
         }
 
-        // Canvas fallback
+        // Use pooled particle system if available
+        if (this.particles) {
+            this.particles.emit({
+                x, y,
+                count: 6,
+                speed: [80, 200],
+                spread: Math.PI * 2,
+                lifetime: [0.08, 0.2],
+                size: [2, 4],
+                endSize: 0,
+                color: ['#f1c40f', '#ffffff', '#e67e22'],
+                alpha: 1.0,
+                endAlpha: 0,
+                gravity: 0,
+                friction: 0.9,
+                layer: 'above'
+            });
+            return;
+        }
+
+        // Legacy fallback
         const sparkCount = 6;
         for (let i = 0; i < sparkCount; i++) {
             const angle = (Math.PI * 2 * i) / sparkCount + Math.random() * 0.5;
@@ -767,6 +866,14 @@ class Game {
             this.cameraX += (Math.random() * 2 - 1) * currentIntensity;
             this.cameraY += (Math.random() * 2 - 1) * currentIntensity;
         }
+
+        // Camera recoil (decays smoothly, frame-rate independent)
+        const recovery = CONFIG.CAMERA_RECOIL_RECOVERY || 0.15;
+        const recoilDecay = Math.pow(1 - recovery, dt * 60);
+        this.cameraRecoilX *= recoilDecay;
+        this.cameraRecoilY *= recoilDecay;
+        this.cameraX += this.cameraRecoilX;
+        this.cameraY += this.cameraRecoilY;
     }
 
     triggerScreenShake(intensity, duration) {
@@ -828,8 +935,49 @@ class Game {
     }
 
     spawnDeathParticles(x, y) {
-        const count = CONFIG.DEATH_PARTICLE_COUNT || 12;
-        const lifetime = CONFIG.DEATH_PARTICLE_LIFETIME || 0.6;
+        // Use pooled particle system if available
+        if (this.particles) {
+            // Above-layer burst (colorful death explosion)
+            this.particles.emit({
+                x, y,
+                count: CONFIG.DEATH_PARTICLE_COUNT || 18,
+                speed: [40, 120],
+                spread: Math.PI * 2,
+                lifetime: [0.4, CONFIG.DEATH_PARTICLE_LIFETIME || 0.8],
+                size: [2, 5],
+                endSize: 0,
+                color: ['#c0392b', '#e74c3c', '#ff6b6b', '#8b7355'],
+                alpha: 0.9,
+                endAlpha: 0,
+                gravity: 60,
+                friction: 0.95,
+                layer: 'above'
+            });
+
+            // Ground marks (below-layer, long-lasting stains)
+            if (CONFIG.DEATH_PARTICLE_GROUND_MARK) {
+                this.particles.emit({
+                    x, y,
+                    count: 5,
+                    speed: [5, 20],
+                    spread: Math.PI * 2,
+                    lifetime: [CONFIG.DEATH_PARTICLE_MARK_LIFETIME || 3.0, (CONFIG.DEATH_PARTICLE_MARK_LIFETIME || 3.0) + 1],
+                    size: CONFIG.DEATH_PARTICLE_MARK_SIZE || [2, 5],
+                    endSize: [1, 2],
+                    color: ['#3d1c1c', '#4a2020'],
+                    alpha: 0.4,
+                    endAlpha: 0,
+                    gravity: 0,
+                    friction: 0.8,
+                    layer: 'below'
+                });
+            }
+            return;
+        }
+
+        // Legacy fallback (inline particles)
+        const count = CONFIG.DEATH_PARTICLE_COUNT || 18;
+        const lifetime = CONFIG.DEATH_PARTICLE_LIFETIME || 0.8;
         for (let i = 0; i < count; i++) {
             const angle = (Math.PI * 2 * i) / count + Math.random() * 0.3;
             const speed = 80 + Math.random() * 120;
@@ -893,6 +1041,11 @@ class Game {
             this.lastPortalId = portal.id;
             this.portalCooldown = 30;
             return;
+        }
+
+        // Play portal enter sound
+        if (window.gameState?.audioManager) {
+            gameState.audioManager.playSound('portal_enter', { volume: 0.4 });
         }
 
         if (this.onPortalEnter) {
@@ -1102,12 +1255,22 @@ class Game {
             this.zone.draw(this.ctx, this.cameraX, this.cameraY);
         }
 
+        // Draw below-layer particles (ground marks, dust motes)
+        if (this.particles) {
+            this.particles.drawBelow(this.ctx, this.cameraX, this.cameraY);
+        }
+
         // Draw players, enemies, and NPCs with visibility culling
         this.drawEntitiesCulled(this.players);
         this.drawEntitiesCulled(this.enemies);
         this.drawEntitiesCulled(this.npcs);
 
-        // Draw projectiles and effects
+        // Draw above-layer particles (sparks, trails, death bursts)
+        if (this.particles) {
+            this.particles.drawAbove(this.ctx, this.cameraX, this.cameraY);
+        }
+
+        // Draw projectiles and legacy effects
         this.drawProjectiles();
         this.drawHitSparks();
         this.drawDeathParticles();

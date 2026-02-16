@@ -52,6 +52,9 @@ class Enemy {
         // Knockback state
         this.knockbackVX = 0;
         this.knockbackVY = 0;
+
+        // Damage flash (visual feedback on hit)
+        this.damageFlashTimer = 0;
     }
     /**
      * Update enemy AI - chase and attack target
@@ -120,6 +123,12 @@ class Enemy {
         if (this.attackCooldown > 0) {
             this.attackCooldown -= dt;
         }
+
+        // Damage flash timer
+        if (this.damageFlashTimer > 0) {
+            this.damageFlashTimer -= dt;
+            if (this.damageFlashTimer < 0) this.damageFlashTimer = 0;
+        }
     }
     /**
      * Apply damage to enemy
@@ -127,6 +136,8 @@ class Enemy {
      */
     takeDamage(amount) {
         this.hp = Math.max(0, this.hp - amount);
+        const flashDuration = typeof CONFIG !== 'undefined' ? CONFIG.ENEMY_DAMAGE_FLASH_DURATION : 0.12;
+        this.damageFlashTimer = flashDuration;
     }
     /**
      * Apply knockback impulse away from a point
@@ -180,6 +191,16 @@ class Enemy {
         } else {
             // Minimal fallback
             ctx.fillStyle = this.stunned ? '#8a8580' : '#5c4a4a';
+            ctx.beginPath();
+            ctx.arc(screenX, screenY, radius, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Damage flash overlay (white flash on hit)
+        if (this.damageFlashTimer > 0) {
+            const flashDuration = typeof CONFIG !== 'undefined' ? CONFIG.ENEMY_DAMAGE_FLASH_DURATION : 0.12;
+            const flashAlpha = Math.min(1, this.damageFlashTimer / flashDuration);
+            ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha * 0.7})`;
             ctx.beginPath();
             ctx.arc(screenX, screenY, radius, 0, Math.PI * 2);
             ctx.fill();

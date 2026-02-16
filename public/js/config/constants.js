@@ -91,8 +91,37 @@ const CONFIG = {
   KNOCKBACK_DECAY: 0.85,             // Knockback velocity multiplier per frame
   DAMAGE_NUMBER_LIFETIME: 0.8,       // How long damage numbers last (seconds)
   DAMAGE_NUMBER_SPEED: 60,           // Upward float speed (pixels/sec)
-  DEATH_PARTICLE_COUNT: 12,          // Particles spawned on enemy death
-  DEATH_PARTICLE_LIFETIME: 0.6,      // Particle lifetime (seconds)
+  DEATH_PARTICLE_COUNT: 18,          // Particles spawned on enemy death
+  DEATH_PARTICLE_LIFETIME: 0.8,      // Particle lifetime (seconds)
+  DEATH_PARTICLE_GROUND_MARK: true,  // Spawn ground marks on death
+  DEATH_PARTICLE_MARK_LIFETIME: 3.0, // Ground mark fade time (seconds)
+  DEATH_PARTICLE_MARK_SIZE: [2, 5],  // Ground mark size range
+
+  // ===================
+  // Ambient Particles
+  // ===================
+  DUST_PARTICLE_LIFETIME: [4.0, 8.0],  // Random range (seconds)
+  DUST_PARTICLE_SIZE: [1, 3],           // Random size range
+  DUST_PARTICLE_SPEED: [3, 12],         // Random speed range
+  DUST_PARTICLE_ALPHA: 0.15,            // Max opacity for dust motes
+  DUST_SPAWN_INTERVAL: 0.3,             // Seconds between dust spawns
+
+  // ===================
+  // Enemy Damage Flash
+  // ===================
+  ENEMY_DAMAGE_FLASH_DURATION: 0.12,    // White flash on hit (seconds)
+
+  // ===================
+  // Camera Recoil
+  // ===================
+  CAMERA_RECOIL_DISTANCE: 3,            // Pixels of camera recoil on fire
+  CAMERA_RECOIL_RECOVERY: 0.15,         // Recoil decay factor per frame
+
+  // ===================
+  // Footsteps
+  // ===================
+  FOOTSTEP_INTERVAL: 0.3,               // Seconds between footstep sounds
+  FOOTSTEP_VOLUME: 0.12,                // Volume for footstep SFX
 
   // ===================
   // Audio System
