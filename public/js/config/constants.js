@@ -114,8 +114,8 @@ const CONFIG = {
   // ===================
   // Camera Recoil
   // ===================
-  CAMERA_RECOIL_DISTANCE: 3,            // Pixels of camera recoil on fire
-  CAMERA_RECOIL_RECOVERY: 0.15,         // Recoil decay factor per frame
+  CAMERA_RECOIL_DISTANCE: 1.5,          // Pixels of camera recoil on fire (subtle nudge)
+  CAMERA_RECOIL_RECOVERY: 0.25,         // Recoil decay factor per frame (snaps back fast)
 
   // ===================
   // Footsteps
