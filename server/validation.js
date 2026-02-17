@@ -7,7 +7,8 @@ const ROOM_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
 const PLAYER_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
 const USERNAME_PATTERN = /^[A-Za-z0-9]([A-Za-z0-9 _-]*[A-Za-z0-9])?$/;
 const ALLOWED_ZONE_IDS = new Set(['hub', 'training', 'elevator', 'hallway', 'elevator2', 'tanks', 'cards']);
-const PLAYER_STATE_KEYS = new Set(['id', 'x', 'y', 'angle', 'speed', 'zoneLevel', 'username', 'stunned', 'hp', 'isDead']);
+const PLAYER_STATE_KEYS = new Set(['id', 'x', 'y', 'angle', 'speed', 'velocityX', 'velocityY', 'lastDirection', 'zoneLevel', 'username', 'stunned', 'hp', 'isDead']);
+const VALID_DIRECTIONS = new Set(['up', 'down', 'left', 'right']);
 const INVENTORY_MAX_ITEMS = 16;
 const CHAT_MESSAGE_MAX_LENGTH = 200;
 const CHAT_MESSAGE_PATTERN = /^[A-Za-z0-9\s.,!?'"()-]*$/;
@@ -58,9 +59,12 @@ function isValidPlayerState(state) {
   if (state.id !== undefined && !isValidPlayerId(state.id)) return false;
   if (state.username !== undefined && !isValidUsername(state.username)) return false;
 
-  // Validate optional hp and isDead fields
+  // Validate optional fields
   if (state.hp !== undefined && !isFiniteNumberInRange(state.hp, 0, 10000)) return false;
   if (state.isDead !== undefined && typeof state.isDead !== 'boolean') return false;
+  if (state.velocityX !== undefined && !isFiniteNumberInRange(state.velocityX, -10000, 10000)) return false;
+  if (state.velocityY !== undefined && !isFiniteNumberInRange(state.velocityY, -10000, 10000)) return false;
+  if (state.lastDirection !== undefined && !VALID_DIRECTIONS.has(state.lastDirection)) return false;
 
   return true;
 }

@@ -327,11 +327,23 @@ class Game {
             });
         }
         
+        // Determine spawn position: use return portal if coming from another zone, else zone default
+        let spawnX = this.zone.startX;
+        let spawnY = this.zone.startY;
+        if (this.pendingFromZone && this.zone.portals) {
+            const returnPortal = this.zone.portals.find(p => p.id === this.pendingFromZone);
+            if (returnPortal) {
+                spawnX = returnPortal.x + returnPortal.width / 2;
+                spawnY = returnPortal.y + returnPortal.height / 2;
+            }
+            this.pendingFromZone = null;
+        }
+
         // Create local player with network-assigned ID
         const colors = ['#3498db', '#e74c3c', '#2ecc71', '#f1c40f', '#9b59b6', '#1abc9c'];
         this.localPlayer = new Player(
-            this.zone.startX,
-            this.zone.startY,
+            spawnX,
+            spawnY,
             colors[0],
             playerId || 'player1',
             playerName,
@@ -1045,6 +1057,9 @@ class Game {
         if (window.gameState?.audioManager) {
             gameState.audioManager.playSound('portal_enter', { volume: 0.4 });
         }
+
+        // Track which zone we're coming from so the destination can spawn us at the right portal
+        this.pendingFromZone = this.zoneId;
 
         if (this.onPortalEnter) {
             this.onPortalEnter(portal.id);

@@ -558,21 +558,14 @@ class CardGame {
     }
 
     speakDealer(text) {
-        // Dark robotic voice — pitch 0.1, rate 0.55
-        // Distinct from all player alien voices (which range 0.3-2.0 pitch, 0.5-2.0 rate)
+        // Dealer voice: Piper neural TTS pitched down 5 semitones, slowed to 0.85x
+        // Creates a deep, otherworldly tone distinct from all other voices
         if (typeof window !== 'undefined' && window.StrictHotelTTS) {
             window.StrictHotelTTS.speak(text, {
-                pitch: 0.1,   // Extremely low — inhuman, robotic
-                rate: 0.55,   // Slow, menacing cadence
+                voiceId: 'en_US-ryan-medium',
+                pitchShift: -5,
+                rate: 0.85,
             });
-        } else if (typeof window !== 'undefined' && window.speechSynthesis) {
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.rate = 0.55;
-            utterance.pitch = 0.1;
-            utterance.volume = 0.9;
-            const voices = window.speechSynthesis.getVoices();
-            if (voices.length > 0) utterance.voice = voices[0];
-            window.speechSynthesis.speak(utterance);
         }
     }
 

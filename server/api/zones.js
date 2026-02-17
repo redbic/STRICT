@@ -60,6 +60,8 @@ function createZoneRouter(isProduction) {
       await fs.mkdir(zonesDir, { recursive: true });
       const filePath = path.join(zonesDir, `${zoneId}.json`);
       await fs.writeFile(filePath, JSON.stringify(zoneData, null, 2));
+      // Invalidate cache so next load gets fresh data
+      zoneDataCache.delete(zoneId);
       res.json({ success: true, zoneId });
     } catch (error) {
       console.error('Zone save error:', error);

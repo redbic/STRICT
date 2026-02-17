@@ -22,6 +22,10 @@ const SESSION_TYPES = {
 function createZoneSession(roomId, zoneId, zoneData, deps) {
   const ruleset = zoneData && zoneData.ruleset;
   const SessionClass = SESSION_TYPES[ruleset] || ZoneSession;
+  if (!SessionClass) {
+    console.error(`No session class found for ruleset "${ruleset}", falling back to ZoneSession`);
+    return new ZoneSession(roomId, zoneId, zoneData || {}, deps);
+  }
   return new SessionClass(roomId, zoneId, zoneData || {}, deps);
 }
 

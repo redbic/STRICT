@@ -719,6 +719,9 @@ class Player {
             y: this.y,
             angle: this.angle,
             speed: this.speed,
+            velocityX: this.velocityX,
+            velocityY: this.velocityY,
+            lastDirection: this.lastDirection || 'down',
             zoneLevel: this.zoneLevel,
             username: this.username,
             stunned: this.stunned,
@@ -733,6 +736,9 @@ class Player {
         this.targetY = state.y;
         this.angle = state.angle;
         this.speed = state.speed;
+        if (state.velocityX !== undefined) this.velocityX = state.velocityX;
+        if (state.velocityY !== undefined) this.velocityY = state.velocityY;
+        if (state.lastDirection) this.lastDirection = state.lastDirection;
         this.zoneLevel = state.zoneLevel;
         this.stunned = state.stunned;
         if (state.hp !== undefined) this.hp = state.hp;
